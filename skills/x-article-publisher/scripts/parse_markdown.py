@@ -5,7 +5,7 @@ Parse Markdown for X Articles publishing.
 Extracts:
 - Title (from first H1/H2 or first line)
 - Cover image (first image)
-- Content images with position info
+- Content images with block index for precise positioning
 - HTML content (images stripped)
 
 Usage:
@@ -16,11 +16,15 @@ Output (JSON):
     "title": "Article Title",
     "cover_image": "/path/to/cover.jpg",
     "content_images": [
-        {"path": "/path/to/img1.jpg", "after_text": "text before image..."},
+        {"path": "/path/to/img.jpg", "block_index": 3, "after_text": "context..."},
         ...
     ],
-    "html": "<p>Content...</p><h2>Section</h2>..."
+    "html": "<p>Content...</p><h2>Section</h2>...",
+    "total_blocks": 25
 }
+
+The block_index indicates which block element (0-indexed) the image should follow.
+This allows precise positioning without relying on text matching.
 """
 
 import argparse
@@ -31,44 +35,123 @@ import sys
 from pathlib import Path
 
 
-def extract_images(markdown: str, base_path: Path) -> tuple[list[dict], str]:
-    """Extract all images and return (image_list, markdown_without_images)."""
+def split_into_blocks(markdown: str) -> list[str]:
+    """Split markdown into logical blocks (paragraphs, headers, quotes, code blocks, etc.)."""
+    blocks = []
+    current_block = []
+    in_code_block = False
+    code_block_lines = []
+
+    lines = markdown.split('\n')
+
+    for line in lines:
+        stripped = line.strip()
+
+        # Handle code block boundaries
+        if stripped.startswith('```'):
+            if in_code_block:
+                # End of code block
+                in_code_block = False
+                if code_block_lines:
+                    # Mark as code block with special prefix for later processing
+                    # Use ___CODE_BLOCK_START___ and ___CODE_BLOCK_END___ to preserve content
+                    blocks.append('___CODE_BLOCK_START___' + '\n'.join(code_block_lines) + '___CODE_BLOCK_END___')
+                code_block_lines = []
+            else:
+                # Start of code block
+                if current_block:
+                    blocks.append('\n'.join(current_block))
+                    current_block = []
+                in_code_block = True
+            continue
+
+        # If inside code block, collect ALL lines (including empty lines)
+        if in_code_block:
+            code_block_lines.append(line)
+            continue
+
+        # Empty line signals end of block
+        if not stripped:
+            if current_block:
+                blocks.append('\n'.join(current_block))
+                current_block = []
+            continue
+
+        # Headers, blockquotes are their own blocks
+        if stripped.startswith(('#', '>')):
+            if current_block:
+                blocks.append('\n'.join(current_block))
+                current_block = []
+            blocks.append(stripped)
+            continue
+
+        # Image on its own line is its own block
+        if re.match(r'^!\[.*\]\(.*\)$', stripped):
+            if current_block:
+                blocks.append('\n'.join(current_block))
+                current_block = []
+            blocks.append(stripped)
+            continue
+
+        current_block.append(line)
+
+    if current_block:
+        blocks.append('\n'.join(current_block))
+
+    # Handle unclosed code block
+    if code_block_lines:
+        blocks.append('___CODE_BLOCK_START___' + '\n'.join(code_block_lines) + '___CODE_BLOCK_END___')
+
+    return blocks
+
+
+def extract_images_with_block_index(markdown: str, base_path: Path) -> tuple[list[dict], str, int]:
+    """Extract images with their block index position.
+
+    Returns:
+        (image_list, markdown_without_images, total_blocks)
+    """
+    blocks = split_into_blocks(markdown)
     images = []
+    clean_blocks = []
 
-    # Pattern for markdown images: ![alt](path)
-    img_pattern = re.compile(r'!\[([^\]]*)\]\(([^)]+)\)')
+    img_pattern = re.compile(r'^!\[([^\]]*)\]\(([^)]+)\)$')
 
-    # Find all images with their positions
-    for match in img_pattern.finditer(markdown):
-        alt_text = match.group(1)
-        img_path = match.group(2)
+    for i, block in enumerate(blocks):
+        match = img_pattern.match(block.strip())
+        if match:
+            alt_text = match.group(1)
+            img_path = match.group(2)
 
-        # Resolve relative paths
-        if not os.path.isabs(img_path):
-            full_path = str(base_path / img_path)
+            # Resolve relative paths
+            if not os.path.isabs(img_path):
+                full_path = str(base_path / img_path)
+            else:
+                full_path = img_path
+
+            # block_index is the index in clean_blocks (without images)
+            # i.e., this image should be inserted after clean_blocks[block_index-1]
+            block_index = len(clean_blocks)
+
+            # Get context from previous block for reference
+            after_text = ""
+            if clean_blocks:
+                prev_block = clean_blocks[-1].strip()
+                # Get last line of previous block
+                lines = [l for l in prev_block.split('\n') if l.strip()]
+                after_text = lines[-1][:80] if lines else ""
+
+            images.append({
+                "path": full_path,
+                "alt": alt_text,
+                "block_index": block_index,
+                "after_text": after_text  # Keep for reference/debugging
+            })
         else:
-            full_path = img_path
+            clean_blocks.append(block)
 
-        # Get text before this image (last 50 chars for context)
-        start_pos = match.start()
-        text_before = markdown[:start_pos].strip()
-        # Get last meaningful line
-        lines_before = [l for l in text_before.split('\n') if l.strip()]
-        after_text = lines_before[-1][:100] if lines_before else ""
-
-        images.append({
-            "path": full_path,
-            "alt": alt_text,
-            "after_text": after_text,
-            "position": start_pos
-        })
-
-    # Remove images from markdown
-    clean_markdown = img_pattern.sub('', markdown)
-    # Clean up extra blank lines
-    clean_markdown = re.sub(r'\n{3,}', '\n\n', clean_markdown)
-
-    return images, clean_markdown
+    clean_markdown = '\n\n'.join(clean_blocks)
+    return images, clean_markdown, len(clean_blocks)
 
 
 def extract_title(markdown: str) -> tuple[str, str]:
@@ -112,6 +195,17 @@ def markdown_to_html(markdown: str) -> str:
     """Convert markdown to HTML for X Articles rich text paste."""
     html = markdown
 
+    # Process code blocks first (marked with ___CODE_BLOCK_START___ and ___CODE_BLOCK_END___)
+    # Convert to blockquote format since X Articles doesn't support <pre><code>
+    def convert_code_block(match):
+        code_content = match.group(1)
+        lines = code_content.strip().split('\n')
+        # Join non-empty lines with <br> for display
+        formatted = '<br>'.join(line for line in lines if line.strip())
+        return f'<blockquote>{formatted}</blockquote>'
+
+    html = re.sub(r'___CODE_BLOCK_START___(.*?)___CODE_BLOCK_END___', convert_code_block, html, flags=re.DOTALL)
+
     # Headers (H2 only, H1 is title)
     html = re.sub(r'^## (.+)$', r'<h2>\1</h2>', html, flags=re.MULTILINE)
     html = re.sub(r'^### (.+)$', r'<h3>\1</h3>', html, flags=re.MULTILINE)
@@ -125,7 +219,7 @@ def markdown_to_html(markdown: str) -> str:
     # Links
     html = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'<a href="\2">\1</a>', html)
 
-    # Blockquotes
+    # Blockquotes (regular markdown blockquotes, not code blocks)
     html = re.sub(r'^> (.+)$', r'<blockquote>\1</blockquote>', html, flags=re.MULTILINE)
 
     # Unordered lists
@@ -164,11 +258,11 @@ def parse_markdown_file(filepath: str) -> dict:
     with open(filepath, 'r', encoding='utf-8') as f:
         content = f.read()
 
-    # Extract images first
-    images, clean_markdown = extract_images(content, base_path)
+    # Extract title first (and remove H1 from markdown)
+    title, content = extract_title(content)
 
-    # Extract title (and remove H1 from markdown to avoid duplication)
-    title, clean_markdown = extract_title(clean_markdown)
+    # Extract images with block indices
+    images, clean_markdown, total_blocks = extract_images_with_block_index(content, base_path)
 
     # Convert to HTML
     html = markdown_to_html(clean_markdown)
@@ -177,11 +271,15 @@ def parse_markdown_file(filepath: str) -> dict:
     cover_image = images[0]["path"] if images else None
     content_images = images[1:] if len(images) > 1 else []
 
+    # Adjust block_index for content images (subtract 1 since cover image is removed)
+    # The first content image's block_index was calculated including cover image's position
+
     return {
         "title": title,
         "cover_image": cover_image,
         "content_images": content_images,
         "html": html,
+        "total_blocks": total_blocks,
         "source_file": str(path.absolute())
     }
 

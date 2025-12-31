@@ -4,6 +4,8 @@
 
 > Publish Markdown articles to X (Twitter) Articles with one command. Say goodbye to tedious rich text editing.
 
+**v1.1.0** — Now with block-index positioning for precise image placement
+
 ---
 
 ## The Problem
@@ -37,7 +39,7 @@ This skill automates the entire publishing workflow:
 ```
 Markdown File
      ↓ Python parsing
-Structured Data (title, images, HTML)
+Structured Data (title, images with block_index, HTML)
      ↓ Playwright MCP
 X Articles Editor (browser automation)
      ↓
@@ -47,9 +49,28 @@ Draft Saved (never auto-publishes)
 ### Key Features
 
 - **Rich Text Paste**: Convert Markdown to HTML, paste via clipboard — all formatting preserved
-- **Smart Image Insertion**: Copy image to clipboard → Click paragraph → Paste (2 steps vs 5 clicks)
-- **Precise Positioning**: Extract context text to locate exact insertion points
+- **Block-Index Positioning** (v1.1): Precise image placement using element indices, not text matching
+- **Reverse Insertion**: Insert images from highest to lowest index to avoid position shifts
+- **Smart Wait Strategy**: Conditions return immediately when met, no wasted wait time
 - **Safe by Design**: Only saves as draft, never publishes automatically
+
+---
+
+## What's New in v1.1.0
+
+| Feature | Before | After |
+|---------|--------|-------|
+| Image positioning | Text matching (fragile) | Block index (precise) |
+| Insertion order | Sequential | Reverse (high→low) |
+| Wait behavior | Fixed delay | Immediate return on condition |
+
+### Why Block-Index?
+
+Previously, images were positioned by matching surrounding text — this failed when:
+- Multiple paragraphs had similar content
+- Text was too short to be unique
+
+Now, each image has a `block_index` indicating exactly which block element it follows. This is deterministic and reliable.
 
 ---
 
@@ -111,8 +132,8 @@ Help me post this article to X Articles: ~/Documents/my-post.md
 
 ```
 [1/7] Parse Markdown...
-      → Extract title, cover image, content images
-      → Convert to HTML
+      → Extract title, cover image, content images with block_index
+      → Convert to HTML, count total blocks
 
 [2/7] Open X Articles editor...
       → Navigate to x.com/compose/articles
@@ -121,14 +142,16 @@ Help me post this article to X Articles: ~/Documents/my-post.md
       → First image becomes cover
 
 [4/7] Fill title...
+      → H1 used as title (not included in body)
 
 [5/7] Paste article content...
       → Rich text via clipboard
       → All formatting preserved
 
-[6/7] Insert content images...
-      → Locate by context text
-      → Paste via clipboard
+[6/7] Insert content images (reverse order)...
+      → Sort by block_index descending
+      → Click block element at index → Paste image
+      → Wait for upload (returns immediately when done)
 
 [7/7] Save draft...
       → ✅ Review and publish manually
@@ -140,7 +163,7 @@ Help me post this article to X Articles: ~/Documents/my-post.md
 
 | Syntax | Result |
 |--------|--------|
-| `# H1` | Article title (extracted) |
+| `# H1` | Article title (extracted, not in body) |
 | `## H2` | Section headers |
 | `**bold**` | **Bold text** |
 | `*italic*` | *Italic text* |
@@ -178,18 +201,30 @@ AI tools exploded in 2024. Here are 5 worth your attention.
 ![midjourney](./images/midjourney.jpg)
 ```
 
-### Command
+### Parsed Output (JSON)
 
+```json
+{
+  "title": "5 AI Tools Worth Watching in 2024",
+  "cover_image": "./images/cover.jpg",
+  "content_images": [
+    {"path": "./images/claude-demo.png", "block_index": 4},
+    {"path": "./images/midjourney.jpg", "block_index": 6}
+  ],
+  "total_blocks": 7
+}
 ```
-Publish ~/article.md to X
-```
+
+### Insertion Order
+
+Images inserted in reverse: `block_index=6` first, then `block_index=4`.
 
 ### Result
 
 - Cover: `cover.jpg` uploaded
 - Title: "5 AI Tools Worth Watching in 2024"
 - Content: Rich text with H2, bold, quotes, links
-- Images: Inserted at correct positions
+- Images: Inserted at precise positions via block index
 - Status: **Draft saved** (ready for manual review)
 
 ---
@@ -204,7 +239,7 @@ x-article-publisher-skill/
 │   └── x-article-publisher/
 │       ├── SKILL.md             # Skill instructions
 │       └── scripts/
-│           ├── parse_markdown.py
+│           ├── parse_markdown.py    # Extracts block_index
 │           └── copy_to_clipboard.py
 ├── docs/
 │   └── GUIDE.md                 # Detailed guide
@@ -229,11 +264,36 @@ A: Check: valid path, supported format (jpg/png/gif/webp), stable network.
 **Q: Can I publish to multiple accounts?**
 A: Not automatically. Switch accounts in browser manually before running.
 
+**Q: Why insert images in reverse order?**
+A: Each inserted image shifts subsequent block indices. Inserting from highest to lowest ensures earlier indices remain valid.
+
+**Q: What if text matching was used before?**
+A: v1.1 replaces text matching with `block_index`. The `after_text` field is kept for debugging but not used for positioning.
+
+**Q: Why does wait return immediately sometimes?**
+A: `browser_wait_for textGone="..."` returns as soon as the text disappears. The `time` parameter is just a maximum, not a fixed delay.
+
 ---
 
 ## Documentation
 
 - [Detailed Usage Guide](docs/GUIDE.md) — Complete documentation with examples
+
+---
+
+## Changelog
+
+### v1.1.0 (2024-12)
+- **Block-index positioning**: Replace text matching with precise element indices
+- **Reverse insertion order**: Prevent index shifts when inserting multiple images
+- **Optimized wait strategy**: Return immediately when upload completes
+- **H1 title handling**: H1 extracted as title, not included in body HTML
+
+### v1.0.0 (2024-12)
+- Initial release
+- Rich text paste via clipboard
+- Cover + content image support
+- Draft-only publishing
 
 ---
 
