@@ -1,34 +1,34 @@
-# X Article Publisher Skill
+# Xiaohongshu Publisher Skill (小红书发布器)
 
 [English](README.md) | [中文](README_CN.md)
 
-> Publish Markdown articles to X (Twitter) Articles with one command. Say goodbye to tedious rich text editing.
+> Publish images and notes to Xiaohongshu (小红书) with one command. Supports QR code login and multi-image uploads.
 
-**v1.1.0** — Now with block-index positioning for precise image placement
+**v2.0.0** — Now using agent-browser for reliable automation
 
 ---
 
 ## The Problem
 
-If you're used to writing in Markdown, publishing to X Articles is a **painful process**:
+Publishing to Xiaohongshu manually is tedious:
 
 | Pain Point | Description |
 |------------|-------------|
-| **Format Loss** | Copy from Markdown editor → Paste to X → All formatting gone |
-| **Manual Formatting** | Set each H2, bold, link manually — 15-20 min per article |
-| **Tedious Image Upload** | 5 clicks per image: Add media → Media → Add photo → Select → Wait |
-| **Position Errors** | Hard to remember where each image should go |
+| **Login Hassle** | Must scan QR code every session |
+| **Multiple Images** | Upload images one by one |
+| **Content Formatting** | Copy-paste text, add tags manually |
+| **Time Consuming** | 5-10 minutes per post |
 
 ### Time Comparison
 
 | Task | Manual | With This Skill |
 |------|--------|-----------------|
-| Format conversion | 15-20 min | 0 (automatic) |
-| Cover image | 1-2 min | 10 sec |
-| 5 content images | 5-10 min | 1 min |
-| **Total** | **20-30 min** | **2-3 min** |
+| Login | 30 sec - 1 min | Auto-detected, prompted |
+| Image upload (5 images) | 2-3 min | 30 sec |
+| Title & content | 1-2 min | 10 sec |
+| **Total** | **5-10 min** | **1-2 min** |
 
-**10x efficiency improvement**
+**5x efficiency improvement**
 
 ---
 
@@ -37,40 +37,33 @@ If you're used to writing in Markdown, publishing to X Articles is a **painful p
 This skill automates the entire publishing workflow:
 
 ```
-Markdown File
+Images/Markdown File
      ↓ Python parsing
-Structured Data (title, images with block_index, HTML)
-     ↓ Playwright MCP
-X Articles Editor (browser automation)
+Structured Data (title, content, images, tags)
+     ↓ agent-browser CLI
+Xiaohongshu Creator Platform (browser automation)
      ↓
-Draft Saved (never auto-publishes)
+Draft/Published Note
 ```
 
 ### Key Features
 
-- **Rich Text Paste**: Convert Markdown to HTML, paste via clipboard — all formatting preserved
-- **Block-Index Positioning** (v1.1): Precise image placement using element indices, not text matching
-- **Reverse Insertion**: Insert images from highest to lowest index to avoid position shifts
-- **Smart Wait Strategy**: Conditions return immediately when met, no wasted wait time
-- **Safe by Design**: Only saves as draft, never publishes automatically
+- **QR Code Login Handling**: Detects login page, prompts you to scan QR code
+- **Multi-Image Upload**: Upload up to 18 images at once
+- **Content Parsing**: Extract title, content, and tags from Markdown
+- **Safe by Default**: Saves as draft unless you specify publish
+- **agent-browser Powered**: Fast, reliable browser automation
 
 ---
 
-## What's New in v1.1.0
+## What's New in v2.0.0
 
-| Feature | Before | After |
-|---------|--------|-------|
-| Image positioning | Text matching (fragile) | Block index (precise) |
-| Insertion order | Sequential | Reverse (high→low) |
-| Wait behavior | Fixed delay | Immediate return on condition |
-
-### Why Block-Index?
-
-Previously, images were positioned by matching surrounding text — this failed when:
-- Multiple paragraphs had similar content
-- Text was too short to be unique
-
-Now, each image has a `block_index` indicating exactly which block element it follows. This is deterministic and reliable.
+| Feature | v1.x | v2.0 |
+|---------|------|------|
+| Platform | X (Twitter) | Xiaohongshu |
+| Browser automation | Playwright MCP | agent-browser CLI |
+| Login handling | Manual | QR code detection + prompt |
+| Content type | Articles | Image notes |
 
 ---
 
@@ -79,13 +72,16 @@ Now, each image has a `block_index` indicating exactly which block element it fo
 | Requirement | Details |
 |-------------|---------|
 | Claude Code | [claude.ai/code](https://claude.ai/code) |
-| Playwright MCP | Browser automation |
-| X Premium Plus | Required for Articles feature |
+| agent-browser | `npm install -g agent-browser` or use npx |
 | Python 3.9+ | With dependencies below |
 | macOS | Currently macOS only |
 
 ```bash
+# Install Python dependencies
 pip install Pillow pyobjc-framework-Cocoa
+
+# Install agent-browser (optional, can use npx)
+npm install -g agent-browser
 ```
 
 ---
@@ -95,15 +91,15 @@ pip install Pillow pyobjc-framework-Cocoa
 ### Method 1: Git Clone (Recommended)
 
 ```bash
-git clone https://github.com/wshuyi/x-article-publisher-skill.git
-cp -r x-article-publisher-skill/skills/x-article-publisher ~/.claude/skills/
+git clone https://github.com/wshuyi/xiaohongshu-publisher-skill.git
+cp -r xiaohongshu-publisher-skill/skills/xiaohongshu-publisher ~/.claude/skills/
 ```
 
 ### Method 2: Plugin Marketplace
 
 ```
-/plugin marketplace add wshuyi/x-article-publisher-skill
-/plugin install x-article-publisher@wshuyi/x-article-publisher-skill
+/plugin marketplace add wshuyi/xiaohongshu-publisher-skill
+/plugin install xiaohongshu-publisher@wshuyi/xiaohongshu-publisher-skill
 ```
 
 ---
@@ -113,17 +109,22 @@ cp -r x-article-publisher-skill/skills/x-article-publisher ~/.claude/skills/
 ### Natural Language
 
 ```
-Publish /path/to/article.md to X
+发布这些图片到小红书: /path/to/photo1.jpg, /path/to/photo2.jpg
+标题是"周末探店"
 ```
 
 ```
-Help me post this article to X Articles: ~/Documents/my-post.md
+Publish /path/to/note.md to Xiaohongshu
+```
+
+```
+帮我把这篇笔记发到小红书，存草稿就行
 ```
 
 ### Skill Command
 
 ```
-/x-article-publisher /path/to/article.md
+/xiaohongshu-publisher /path/to/note.md
 ```
 
 ---
@@ -131,115 +132,85 @@ Help me post this article to X Articles: ~/Documents/my-post.md
 ## Workflow Steps
 
 ```
-[1/7] Parse Markdown...
-      → Extract title, cover image, content images with block_index
-      → Convert to HTML, count total blocks
+[1/6] Parse content...
+      → Extract title, content, images, tags
 
-[2/7] Open X Articles editor...
-      → Navigate to x.com/compose/articles
+[2/6] Open Xiaohongshu creator page...
+      → Navigate to creator.xiaohongshu.com/publish/publish
 
-[3/7] Upload cover image...
-      → First image becomes cover
+[3/6] Handle login (if needed)...
+      → If QR code detected: PROMPT USER TO SCAN
+      → Wait for login completion
 
-[4/7] Fill title...
-      → H1 used as title (not included in body)
+[4/6] Upload images...
+      → Upload all images (1-18 supported)
 
-[5/7] Paste article content...
-      → Rich text via clipboard
-      → All formatting preserved
+[5/6] Fill title and content...
+      → Add title, description, tags
 
-[6/7] Insert content images (reverse order)...
-      → Sort by block_index descending
-      → Click block element at index → Paste image
-      → Wait for upload (returns immediately when done)
-
-[7/7] Save draft...
+[6/6] Save draft...
       → ✅ Review and publish manually
+      → (Or publish directly if requested)
 ```
 
 ---
 
-## Supported Markdown
+## QR Code Login
 
-| Syntax | Result |
-|--------|--------|
-| `# H1` | Article title (extracted, not in body) |
-| `## H2` | Section headers |
-| `**bold**` | **Bold text** |
-| `*italic*` | *Italic text* |
-| `[text](url)` | Hyperlinks |
-| `> quote` | Blockquotes |
-| `- item` | Unordered lists |
-| `1. item` | Ordered lists |
-| `![](img.jpg)` | Images (first = cover) |
+When Xiaohongshu requires login, the skill will:
+
+1. Detect the QR code login page
+2. **Display a message**: "Please scan the QR code with your Xiaohongshu app to log in."
+3. Wait for you to complete the login
+4. Continue with the publishing flow
+
+**Tip**: Keep the Xiaohongshu app ready on your phone for quick scanning.
 
 ---
 
-## Example
+## Content Formats
 
-### Input: `article.md`
+### From Images + Text
+
+```
+发布这些图片到小红书:
+- /path/to/photo1.jpg
+- /path/to/photo2.jpg
+- /path/to/photo3.jpg
+
+标题: 周末好去处
+内容: 发现了一家超赞的咖啡店...
+标签: 咖啡, 探店, 周末
+```
+
+### From Markdown File
 
 ```markdown
-# 5 AI Tools Worth Watching in 2024
+# 周末好去处
 
-![cover](./images/cover.jpg)
+![](./images/photo1.jpg)
+![](./images/photo2.jpg)
 
-AI tools exploded in 2024. Here are 5 worth your attention.
+发现了一家超赞的咖啡店，环境特别好！
 
-## 1. Claude: Best Conversational AI
+推荐指数：⭐⭐⭐⭐⭐
 
-**Claude** by Anthropic excels at long-context understanding.
-
-> Claude's context window reaches 200K tokens.
-
-![claude-demo](./images/claude-demo.png)
-
-## 2. Midjourney: AI Art Leader
-
-[Midjourney](https://midjourney.com) is the most popular AI art tool.
-
-![midjourney](./images/midjourney.jpg)
+#咖啡 #探店 #周末
 ```
-
-### Parsed Output (JSON)
-
-```json
-{
-  "title": "5 AI Tools Worth Watching in 2024",
-  "cover_image": "./images/cover.jpg",
-  "content_images": [
-    {"path": "./images/claude-demo.png", "block_index": 4},
-    {"path": "./images/midjourney.jpg", "block_index": 6}
-  ],
-  "total_blocks": 7
-}
-```
-
-### Insertion Order
-
-Images inserted in reverse: `block_index=6` first, then `block_index=4`.
-
-### Result
-
-- Cover: `cover.jpg` uploaded
-- Title: "5 AI Tools Worth Watching in 2024"
-- Content: Rich text with H2, bold, quotes, links
-- Images: Inserted at precise positions via block index
-- Status: **Draft saved** (ready for manual review)
 
 ---
 
 ## Project Structure
 
 ```
-x-article-publisher-skill/
+xiaohongshu-publisher-skill/
 ├── .claude-plugin/
 │   └── plugin.json              # Plugin config
 ├── skills/
-│   └── x-article-publisher/
+│   └── xiaohongshu-publisher/
 │       ├── SKILL.md             # Skill instructions
 │       └── scripts/
-│           ├── parse_markdown.py    # Extracts block_index
+│           ├── parse_note.py    # Content parser
 │           └── copy_to_clipboard.py
 ├── docs/
 │   └── GUIDE.md                 # Detailed guide
@@ -250,50 +221,59 @@ x-article-publisher-skill/
 
 ---
 
+## Limits & Best Practices
+
+| Item | Limit |
+|------|-------|
+| Images per note | 1-18 |
+| Title length | ~20 characters recommended |
+| Content length | ~1000 characters max |
+| Tags | Up to 5 recommended |
+| Image formats | JPG, PNG, GIF, WebP |
+
+### Tips
+
+1. **Prepare images first** - Have all images ready before running
+2. **Keep Xiaohongshu app handy** - For quick QR code scanning
+3. **Use draft mode** - Review before publishing
+4. **Compress large images** - Faster uploads
+
+---
+
 ## FAQ
 
-**Q: Why Premium Plus?**
-A: X Articles is exclusive to Premium Plus subscribers.
+**Q: Why agent-browser instead of Playwright MCP?**
+A: agent-browser provides a simpler CLI interface that's easier to use and doesn't require MCP server setup.
+
+**Q: QR code timeout?**
+A: The skill waits up to 2 minutes for login. If timeout occurs, restart the process.
 
 **Q: Windows/Linux support?**
 A: Currently macOS only. PRs welcome for cross-platform clipboard support.
 
 **Q: Image upload failed?**
-A: Check: valid path, supported format (jpg/png/gif/webp), stable network.
+A: Check: valid path, supported format (jpg/png/gif/webp), file size within limits.
 
-**Q: Can I publish to multiple accounts?**
-A: Not automatically. Switch accounts in browser manually before running.
-
-**Q: Why insert images in reverse order?**
-A: Each inserted image shifts subsequent block indices. Inserting from highest to lowest ensures earlier indices remain valid.
-
-**Q: What if text matching was used before?**
-A: v1.1 replaces text matching with `block_index`. The `after_text` field is kept for debugging but not used for positioning.
-
-**Q: Why does wait return immediately sometimes?**
-A: `browser_wait_for textGone="..."` returns as soon as the text disappears. The `time` parameter is just a maximum, not a fixed delay.
-
----
-
-## Documentation
-
-- [Detailed Usage Guide](docs/GUIDE.md) — Complete documentation with examples
+**Q: Can I publish directly instead of draft?**
+A: Yes, specify "发布" or "publish" in your request instead of "存草稿" or "save draft".
 
 ---
 
 ## Changelog
 
+### v2.0.0 (2025-01)
+- **Platform switch**: Xiaohongshu instead of X (Twitter)
+- **agent-browser**: Replace Playwright MCP with agent-browser CLI
+- **QR code login**: Detect and prompt user for login
+- **Image-centric**: Focus on image notes rather than articles
+
 ### v1.1.0 (2025-12)
-- **Block-index positioning**: Replace text matching with precise element indices
-- **Reverse insertion order**: Prevent index shifts when inserting multiple images
-- **Optimized wait strategy**: Return immediately when upload completes
-- **H1 title handling**: H1 extracted as title, not included in body HTML
+- Block-index positioning for X Articles
+- Reverse insertion order
+- Optimized wait strategy
 
 ### v1.0.0 (2025-12)
-- Initial release
-- Rich text paste via clipboard
-- Cover + content image support
-- Draft-only publishing
+- Initial release (X Articles publisher)
 
 ---
 

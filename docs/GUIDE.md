@@ -1,18 +1,19 @@
-# X Article Publisher Skill 使用指南
+# 小红书发布器使用指南
 
-> 一键将 Markdown 文章发布到 X (Twitter) Articles，告别繁琐的富文本编辑。
+> 一键发布图片笔记到小红书。支持二维码登录，多图上传。
 
-**v1.1.0** — 新增 block-index 精确定位，图片位置更准确
+**v2.0.0** — 使用 agent-browser 实现可靠的浏览器自动化
 
 ---
 
-## v1.1.0 更新亮点
+## v2.0.0 更新亮点
 
-| 功能 | v1.0 | v1.1 |
+| 功能 | v1.x | v2.0 |
 |------|------|------|
-| 图片定位 | 文字匹配（不稳定） | Block 索引（精确） |
-| 插入顺序 | 顺序插入 | 反向插入（高→低） |
-| 等待策略 | 固定延时 | 条件满足立即返回 |
+| 平台 | X (Twitter) | 小红书 |
+| 浏览器自动化 | Playwright MCP | agent-browser CLI |
+| 登录处理 | 手动 | 二维码检测 + 提示 |
+| 内容类型 | 长文 | 图片笔记 |
 
 ---
 
@@ -23,87 +24,49 @@
 3. [执行方式](#3-执行方式)
 4. [完整示例](#4-完整示例)
 5. [常见问题](#5-常见问题)
-6. [更新日志](#6-更新日志)
 
 ---
 
 ## 1. 解决的痛点
 
-### 1.1 X Articles 是什么？
+### 1.1 小红书是什么？
 
-X (原 Twitter) 为 Premium Plus 订阅用户提供了 **Articles** 功能，允许用户发布长文章（类似博客），突破 280 字符限制。文章支持：
+小红书（Xiaohongshu/RedNote）是中国最大的生活方式分享平台之一，用户可以发布图片笔记分享生活经验、购物心得、旅行攻略等。
 
-- 富文本格式（标题、粗体、引用等）
-- 多张图片嵌入
-- 超链接
-
-访问入口：https://x.com/compose/articles
+访问入口：https://creator.xiaohongshu.com/publish/publish
 
 ### 1.2 手动发布的痛点
 
-如果你习惯用 Markdown 写作，将内容发布到 X Articles 是一个**极其繁琐**的过程：
+#### 痛点一：登录麻烦
 
-#### 痛点一：格式无法直接粘贴
+每次发布都需要扫码登录，即使刚登录过也可能需要重新扫码。
 
-```
-❌ 从 Markdown 编辑器复制内容 → 粘贴到 X Articles → 格式全部丢失
-```
-
-X Articles 编辑器不支持 Markdown，你需要**逐一手动设置**每个格式：
-- 选中文字 → 点击 H2 按钮
-- 选中文字 → 点击粗体按钮
-- 选中文字 → 点击链接按钮 → 粘贴 URL
-
-一篇包含 5 个小节、10 处加粗、8 个链接的文章，格式设置可能需要 **15-20 分钟**。
-
-#### 痛点二：图片插入效率低下
-
-X Articles 的图片插入流程：
+#### 痛点二：图片上传繁琐
 
 ```
-点击段落 → 点击"添加媒体内容" → 点击"媒体" → 点击"添加照片或视频" → 选择文件 → 等待上传
+选择图片 → 等待上传 → 调整顺序 → 重复以上步骤
 ```
 
-每张图片需要 **5 次点击 + 文件选择 + 等待上传**。一篇包含 5 张图片的文章，仅图片插入就需要 **5-10 分钟**。
+每张图片都需要单独操作，5张图片就需要重复5次。
 
-#### 痛点三：图片位置难以精确控制
+#### 痛点三：内容格式化
 
-Markdown 中图片位置是精确的：
-
-```markdown
-这是第一段内容。
-
-![图1](image1.jpg)
-
-这是第二段内容。
-
-![图2](image2.jpg)
-```
-
-但在 X Articles 中，你需要：
-1. 记住每张图片应该插入的位置
-2. 滚动找到正确的段落
-3. 手动插入
-
-图片越多，出错概率越高。
+需要手动输入标题、描述、添加标签，还要注意字数限制。
 
 #### 痛点四：重复劳动
 
-如果你经常发布长文章，这些操作需要**每次重复**：
-- 每篇文章都要手动转换格式
-- 每张图片都要重复 5 次点击
-- 每次都要检查格式是否正确
+如果你经常发布内容，这些操作需要**每次重复**。
 
 ### 1.3 时间成本对比
 
 | 操作 | 手动方式 | 使用本 Skill |
 |------|----------|--------------|
-| 格式转换 | 15-20 分钟 | 0（自动） |
-| 封面图上传 | 1-2 分钟 | 10 秒 |
-| 5 张内容图插入 | 5-10 分钟 | 1 分钟 |
-| 总计 | **20-30 分钟** | **2-3 分钟** |
+| 登录 | 30秒-1分钟 | 自动检测，提示扫码 |
+| 上传5张图片 | 2-3 分钟 | 30 秒 |
+| 填写内容 | 1-2 分钟 | 10 秒 |
+| 总计 | **5-10 分钟** | **1-2 分钟** |
 
-**效率提升：10 倍以上**
+**效率提升：5 倍以上**
 
 ---
 
@@ -115,21 +78,21 @@ Markdown 中图片位置是精确的：
 
 ```
 ┌─────────────────┐
-│   Markdown 文件  │
+│   图片/Markdown  │
 └────────┬────────┘
          │ Python 解析
          ▼
 ┌─────────────────┐
 │  结构化数据 (JSON) │
 │  - title        │
-│  - cover_image  │
-│  - content_images│
-│  - html         │
+│  - content      │
+│  - images       │
+│  - tags         │
 └────────┬────────┘
-         │ Playwright MCP
+         │ agent-browser CLI
          ▼
 ┌─────────────────┐
-│  X Articles 编辑器 │
+│  小红书创作平台    │
 │  (浏览器自动化)   │
 └─────────────────┘
 ```
@@ -138,129 +101,86 @@ Markdown 中图片位置是精确的：
 
 | 组件 | 作用 |
 |------|------|
-| `parse_markdown.py` | 解析 Markdown，提取标题、图片、转换 HTML |
-| `copy_to_clipboard.py` | 将 HTML/图片复制到系统剪贴板 |
-| Playwright MCP | 控制浏览器，模拟用户操作 |
+| `parse_note.py` | 解析 Markdown/文本，提取标题、内容、图片、标签 |
+| `copy_to_clipboard.py` | 将图片复制到系统剪贴板 |
+| agent-browser | 控制浏览器，模拟用户操作 |
 | Claude Code | 协调整个流程 |
 
-### 2.2 工作流程："先文后图"策略
-
-本 Skill 采用**先文后图**（Text First, Images Later）策略，确保内容完整且图片位置准确：
+### 2.2 工作流程
 
 ```
-Step 1: 解析 Markdown
+Step 1: 解析内容
         ↓
-Step 2: 打开 X Articles 编辑器
+Step 2: 打开小红书创作平台
         ↓
-Step 3: 上传封面图（第一张图片）
+Step 3: 处理登录（QR码扫码）
         ↓
-Step 4: 填写标题
+Step 4: 上传图片（1-18张）
         ↓
-Step 5: 粘贴 HTML 富文本内容（通过剪贴板）
+Step 5: 填写标题和内容
         ↓
-Step 6: 在正确位置插入内容图片（通过剪贴板粘贴）
+Step 6: 添加标签（可选）
         ↓
-Step 7: 保存草稿（绝不自动发布）
+Step 7: 保存草稿/发布
 ```
 
-### 2.3 关键技术优化
+### 2.3 关键技术：agent-browser
 
-#### 优化一：剪贴板富文本粘贴
+agent-browser 是一个轻量级的浏览器自动化 CLI 工具：
 
-传统方式需要逐个设置格式，本 Skill 通过：
+```bash
+# 导航
+npx agent-browser open https://creator.xiaohongshu.com/publish/publish
 
-1. Python 将 Markdown 转换为 HTML
-2. 将 HTML 复制到系统剪贴板（保留富文本格式）
-3. 在编辑器中 `Cmd+V` 粘贴
+# 获取页面快照（包含元素引用）
+npx agent-browser snapshot -i
 
-```python
-# copy_to_clipboard.py 核心逻辑
-from AppKit import NSPasteboard, NSPasteboardTypeHTML
+# 点击元素（使用快照中的 ref）
+npx agent-browser click @e5
 
-pasteboard = NSPasteboard.generalPasteboard()
-pasteboard.setData_forType_(html_data, NSPasteboardTypeHTML)
+# 填写表单
+npx agent-browser fill @e3 "笔记标题"
+
+# 上传文件
+npx agent-browser upload @e2 "/path/to/image.jpg"
+
+# 等待
+npx agent-browser wait --text "发布成功"
 ```
 
-结果：**所有格式一次性粘贴完成**，包括 H2、粗体、链接、列表等。
+**优点**：
+- 无需 MCP 服务器配置
+- 命令行直接使用
+- 快照提供精确的元素引用
 
-#### 优化二：图片剪贴板粘贴
+### 2.4 QR码登录处理
 
-传统方式每张图片需要 5 次点击，本 Skill 通过：
+小红书经常需要扫码登录，本 Skill 会：
 
-1. Python 将图片复制到系统剪贴板
-2. 点击目标段落
-3. `Cmd+V` 粘贴图片
+1. 检测登录页面（查找 QR 码元素）
+2. 通知用户："请使用小红书 App 扫描二维码登录"
+3. 等待登录完成（最多 2 分钟）
+4. 检测到登录成功后继续流程
 
-```python
-# copy_to_clipboard.py 图片处理
-from AppKit import NSPasteboard, NSPasteboardTypeTIFF
-
-# 可选：上传前压缩图片
-img.thumbnail((2000, 2000))
-img.save(buffer, format='JPEG', quality=85)
 ```
-
-对比：
-
-| 方式 | 浏览器操作次数 |
-|------|--------------|
-| 传统 | 5 次点击 + 文件选择 |
-| 本 Skill | 1 次点击 + 1 次粘贴 |
-
-#### 优化三：图片位置精确定位
-
-`parse_markdown.py` 提取每张图片的**块索引信息**（v1.1 新特性）：
-
-```json
-{
-  "content_images": [
-    {
-      "path": "/path/to/img1.jpg",
-      "block_index": 5,
-      "after_text": "上下文文字（仅用于调试）..."
-    }
-  ],
-  "total_blocks": 12
-}
+┌─────────────────────────────────────┐
+│  检测到需要登录                        │
+│                                     │
+│  请使用小红书 App 扫描屏幕上的二维码     │
+│                                     │
+│  正在等待登录...                       │
+└─────────────────────────────────────┘
 ```
-
-**block_index 定位原理**：
-- 每张图片的 `block_index` 表示它应该插入在第 N 个块元素之后（0 索引）
-- 不依赖文字匹配，精确可靠
-- `after_text` 保留用于人工核验，不参与定位
-
-**反向插入策略**：
-- 按 `block_index` 从大到小的顺序插入图片
-- 先插入索引大的，不会影响索引小的位置
-- 例如：先插入 block_index=12，再插入 block_index=5
-
-### 2.4 支持的 Markdown 格式
-
-| Markdown 语法 | 效果 |
-|--------------|------|
-| `# H1` | 文章标题（自动提取） |
-| `## H2` | 二级标题 |
-| `**粗体**` | **粗体文字** |
-| `*斜体*` | *斜体文字* |
-| `[链接](url)` | 超链接 |
-| `> 引用` | 引用块 |
-| `- 列表` | 无序列表 |
-| `1. 列表` | 有序列表 |
-| `![](img.jpg)` | 图片（第一张为封面） |
 
 ### 2.5 安全设计
 
-**绝不自动发布**：本 Skill 仅将内容保存为草稿，最终发布需要用户手动确认。
+**默认保存草稿**：本 Skill 默认将内容保存为草稿，最终发布需要用户明确指定。
 
 ```
-✅ 自动完成：上传、格式化、排版
-❌ 不会执行：点击"发布"按钮
+✅ 默认行为：保存草稿
+✅ 用户可以：指定直接发布
+❌ 不会发生：未经同意自动发布
 ```
-
-这确保用户可以在发布前：
-- 预览最终效果
-- 检查格式是否正确
-- 修改任何需要调整的内容
 
 ---
 
@@ -268,24 +188,18 @@ img.save(buffer, format='JPEG', quality=85)
 
 ### 3.1 前置条件
 
-#### 条件一：X Premium Plus 订阅
+#### 条件一：小红书账号
 
-Articles 功能仅对 Premium Plus 用户开放。验证方式：
-1. 访问 https://x.com/compose/articles
-2. 如果能看到编辑器，说明你有权限
+确保你有小红书账号，并且手机上安装了小红书 App（用于扫码登录）。
 
-#### 条件二：安装 Playwright MCP
+#### 条件二：安装 agent-browser
 
-本 Skill 依赖 Playwright MCP 进行浏览器自动化。
-
-检查是否已安装：
 ```bash
-cat ~/.claude/settings.json | grep playwright
-```
+# 全局安装（推荐）
+npm install -g agent-browser
 
-如未安装，在 Claude Code 中执行：
-```
-帮我安装 Playwright MCP
+# 或使用 npx（无需安装）
+npx agent-browser --version
 ```
 
 #### 条件三：安装 Python 依赖
@@ -304,15 +218,15 @@ python -c "from AppKit import NSPasteboard; print('OK')"
 **方式 A：Git Clone（推荐）**
 
 ```bash
-git clone https://github.com/wshuyi/x-article-publisher-skill.git
-cp -r x-article-publisher-skill/skills/x-article-publisher ~/.claude/skills/
+git clone https://github.com/wshuyi/xiaohongshu-publisher-skill.git
+cp -r xiaohongshu-publisher-skill/skills/xiaohongshu-publisher ~/.claude/skills/
 ```
 
 **方式 B：插件市场**
 
 ```
-/plugin marketplace add wshuyi/x-article-publisher-skill
-/plugin install x-article-publisher@wshuyi/x-article-publisher-skill
+/plugin marketplace add wshuyi/xiaohongshu-publisher-skill
+/plugin install xiaohongshu-publisher@wshuyi/xiaohongshu-publisher-skill
 ```
 
 ### 3.2 触发指令
@@ -322,21 +236,22 @@ cp -r x-article-publisher-skill/skills/x-article-publisher ~/.claude/skills/
 #### 方式一：自然语言
 
 ```
-把 /path/to/article.md 发布到 X
+发布这些图片到小红书: /path/to/photo1.jpg, /path/to/photo2.jpg
+标题是"周末探店"
 ```
 
 ```
-帮我把这篇文章发到 X Articles：~/Documents/my-article.md
+帮我把 ~/Documents/note.md 发到小红书，存草稿就行
 ```
 
 ```
-Publish ~/blog/post.md to X
+把这几张照片发到小红书，标题"美食分享"，内容"今天发现一家超好吃的店！"
 ```
 
 #### 方式二：Skill 命令
 
 ```
-/x-article-publisher /path/to/article.md
+/xiaohongshu-publisher /path/to/note.md
 ```
 
 ### 3.3 操作流程
@@ -344,89 +259,87 @@ Publish ~/blog/post.md to X
 触发后，Claude 会自动执行以下步骤：
 
 ```
-[1/7] 解析 Markdown 文件...
-      → 提取标题：「你的文章标题」
-      → 发现封面图：cover.jpg
-      → 发现 3 张内容图片
-      → HTML 转换完成
+[1/6] 解析内容...
+      → 标题：「周末探店」
+      → 发现 3 张图片
+      → 内容：「发现了一家超赞的咖啡店...」
+      → 标签：咖啡, 探店, 周末
 
-[2/7] 打开 X Articles 编辑器...
-      → 导航到 https://x.com/compose/articles
-      → 等待编辑器加载
+[2/6] 打开小红书创作平台...
+      → 导航到 creator.xiaohongshu.com/publish/publish
 
-[3/7] 上传封面图...
-      → 点击"添加照片或视频"
-      → 上传 cover.jpg
-      → 等待上传完成
+[3/6] 处理登录...
+      → 检测到 QR 码
+      → 请使用小红书 App 扫描二维码登录
+      → 等待登录完成...
+      → 登录成功！
 
-[4/7] 填写标题...
-      → 输入：「你的文章标题」
+[4/6] 上传图片...
+      → 上传 photo1.jpg
+      → 上传 photo2.jpg
+      → 上传 photo3.jpg
+      → 全部上传完成
 
-[5/7] 粘贴文章内容...
-      → HTML 已复制到剪贴板
-      → 粘贴富文本内容
-      → 格式保留：5 个 H2，8 处粗体，12 个链接
+[5/6] 填写内容...
+      → 标题：「周末探店」
+      → 描述：「发现了一家超赞的咖啡店...」
+      → 标签：#咖啡 #探店 #周末
 
-[6/7] 插入内容图片...
-      → 图片 1/3：定位到「这是第一段内容...」后
-      → 图片 2/3：定位到「这是第二段内容...」后
-      → 图片 3/3：定位到「这是第三段内容...」后
-
-[7/7] 保存草稿...
-      → 草稿已自动保存
-      → 请在 X 中预览并手动发布
+[6/6] 保存草稿...
+      → ✅ 草稿已保存
+      → 请在小红书 App 中预览并发布
 ```
 
 ### 3.4 注意事项
 
-1. **保持浏览器可见**：Playwright 需要控制浏览器窗口，请不要最小化
-2. **已登录 X**：确保浏览器中已登录你的 X 账号
-3. **图片路径**：Markdown 中的图片路径需要是有效的本地路径
+1. **准备好手机**：扫码登录需要手机上的小红书 App
+2. **保持浏览器可见**：agent-browser 需要控制浏览器窗口
+3. **图片路径**：确保图片路径有效且文件存在
 4. **网络稳定**：图片上传需要稳定的网络连接
+5. **图片限制**：每篇笔记最多 18 张图片
 
 ---
 
 ## 4. 完整示例
 
-### 4.1 示例 Markdown 文件
+### 4.1 示例一：直接提供图片和文字
 
-文件路径：`~/Documents/ai-tools-review.md`
+```
+发布这些图片到小红书:
+- ~/Photos/coffee1.jpg
+- ~/Photos/coffee2.jpg
+- ~/Photos/coffee3.jpg
+
+标题: 周末咖啡探店
+内容: 发现了一家隐藏在小巷子里的咖啡店，环境超级棒，咖啡也很好喝！推荐他们家的拿铁～
+标签: 咖啡, 探店, 周末好去处
+```
+
+### 4.2 示例二：使用 Markdown 文件
+
+文件路径：`~/Documents/coffee-note.md`
 
 ```markdown
-# 2024 年最值得关注的 5 个 AI 工具
+# 周末咖啡探店
 
-![cover](./images/cover.jpg)
+![](./photos/coffee1.jpg)
+![](./photos/coffee2.jpg)
+![](./photos/coffee3.jpg)
 
-人工智能工具在 2024 年迎来了爆发式增长。本文将介绍 5 个最值得关注的 AI 工具。
+发现了一家隐藏在小巷子里的咖啡店！
 
-## 1. Claude：最强对话 AI
+环境超级棒，适合拍照📷
+咖啡也很好喝，推荐他们家的拿铁～
 
-**Claude** 由 Anthropic 开发，在长文本理解和代码生成方面表现出色。
+地址：XX路XX号
+人均：40元
 
-> Claude 的上下文窗口高达 200K tokens，可以处理整本书的内容。
-
-主要特点：
-- 超长上下文理解
-- 出色的推理能力
-- 安全可靠
-
-![claude-demo](./images/claude-demo.png)
-
-## 2. Midjourney：AI 绘画领导者
-
-[Midjourney](https://midjourney.com) 是目前最受欢迎的 AI 绘画工具。
-
-![midjourney-example](./images/midjourney.jpg)
-
-## 总结
-
-这些工具正在改变我们的工作方式。选择适合自己的工具，提升效率。
+#咖啡 #探店 #周末好去处
 ```
 
-### 4.2 执行命令
-
+执行命令：
 ```
-把 ~/Documents/ai-tools-review.md 发布到 X
+把 ~/Documents/coffee-note.md 发布到小红书
 ```
 
 ### 4.3 执行结果
@@ -436,82 +349,96 @@ Claude 会：
 1. **解析文件**，输出：
    ```json
    {
-     "title": "2024 年最值得关注的 5 个 AI 工具",
-     "cover_image": "~/Documents/images/cover.jpg",
-     "content_images": [
-       {"path": "~/Documents/images/claude-demo.png", "after_text": "安全可靠"},
-       {"path": "~/Documents/images/midjourney.jpg", "after_text": "是目前最受欢迎的 AI 绘画工具"}
-     ]
+     "title": "周末咖啡探店",
+     "content": "发现了一家隐藏在小巷子里的咖啡店！\n\n环境超级棒，适合拍照📷\n咖啡也很好喝，推荐他们家的拿铁～\n\n地址：XX路XX号\n人均：40元",
+     "images": [
+       "~/Documents/photos/coffee1.jpg",
+       "~/Documents/photos/coffee2.jpg",
+       "~/Documents/photos/coffee3.jpg"
+     ],
+     "tags": ["咖啡", "探店", "周末好去处"]
    }
    ```
 
 2. **自动操作浏览器**：
-   - 上传 cover.jpg 作为封面
-   - 填写标题「2024 年最值得关注的 5 个 AI 工具」
-   - 粘贴富文本内容（H2、粗体、引用、链接、列表全部保留）
-   - 在「安全可靠」段落后插入 claude-demo.png
-   - 在「是目前最受欢迎的 AI 绘画工具」段落后插入 midjourney.jpg
+   - 打开创作平台
+   - 处理 QR 码登录
+   - 上传 3 张图片
+   - 填写标题和内容
+   - 添加标签
 
 3. **完成提示**：
    ```
    ✅ 草稿已保存！
 
-   请在 X 中预览文章效果，确认无误后手动点击发布。
-   预览地址：当前浏览器窗口
+   请在小红书 App 中预览笔记效果，确认无误后发布。
    ```
 
 ---
 
 ## 5. 常见问题
 
-### Q1: 为什么需要 Premium Plus？
+### Q1: 为什么用 agent-browser 而不是 Playwright MCP？
 
-A: X Articles 是 Premium Plus 订阅专属功能。普通用户无法访问 `/compose/articles` 页面。
+A: agent-browser 提供更简单的 CLI 接口：
+- 无需配置 MCP 服务器
+- 命令行直接使用
+- 轻量级，快速启动
 
-### Q2: 支持 Windows 吗？
+### Q2: QR 码扫码超时怎么办？
+
+A: 技能会等待最多 2 分钟。如果超时：
+1. 重新运行命令
+2. 提前准备好手机，快速扫码
+
+### Q3: 支持 Windows 吗？
 
 A: 目前仅支持 macOS，因为剪贴板操作使用了 `pyobjc-framework-Cocoa`。Windows 支持需要替换为 `pywin32`，欢迎贡献 PR。
 
-### Q3: 图片上传失败怎么办？
+### Q4: 图片上传失败怎么办？
 
 A: 检查以下几点：
 - 图片路径是否正确
 - 图片格式是否支持（jpg, png, gif, webp）
+- 文件大小是否超过限制
 - 网络连接是否稳定
-- 图片大小是否超过 X 限制
 
-### Q4: 格式粘贴后显示不正确？
+### Q5: 可以直接发布而不是存草稿吗？
 
-A: 确保：
-- Python 依赖已正确安装
-- 使用 `Cmd+V` 粘贴而非右键粘贴
-- 编辑器已完全加载
+A: 可以，在请求中明确说明：
+```
+发布这些图片到小红书，直接发布：...
+```
 
-### Q5: 可以发布到多个账号吗？
+### Q6: 图片数量有限制吗？
 
-A: 目前不支持自动切换账号。如需发布到不同账号，请手动在浏览器中切换后再执行。
+A: 小红书每篇笔记最多支持 18 张图片，至少需要 1 张。
 
-### Q6: 如何自定义图片压缩质量？
+### Q7: 标题和内容有字数限制吗？
 
-A: 在 SKILL.md 中，图片粘贴使用 `--quality 85` 参数。你可以修改这个值（1-100），数值越低压缩越多。
+A:
+- 标题：建议 20 字符以内
+- 内容：最多约 1000 字符
+- 标签：建议最多 5 个
 
 ---
 
 ## 附录：项目结构
 
 ```
-x-article-publisher-skill/
+xiaohongshu-publisher-skill/
 ├── .claude-plugin/
 │   └── plugin.json           # 插件配置
 ├── skills/
-│   └── x-article-publisher/
+│   └── xiaohongshu-publisher/
 │       ├── SKILL.md          # Skill 核心指令
 │       └── scripts/
-│           ├── parse_markdown.py    # Markdown 解析
+│           ├── parse_note.py      # 内容解析
 │           └── copy_to_clipboard.py # 剪贴板操作
 ├── docs/
 │   └── GUIDE.md              # 本文档
 ├── README.md
+├── README_CN.md
 └── LICENSE
 ```
 
@@ -519,10 +446,10 @@ x-article-publisher-skill/
 
 ## 反馈与贡献
 
-- **GitHub**: https://github.com/wshuyi/x-article-publisher-skill
+- **GitHub**: https://github.com/wshuyi/xiaohongshu-publisher-skill
 - **Issues**: 遇到问题请提交 Issue
 - **PR**: 欢迎贡献代码，特别是 Windows/Linux 支持
 
 ---
 
-*本文档由 Claude Code 生成，最后更新：2024-12*
+*本文档由 Claude Code 生成，最后更新：2025-01*
