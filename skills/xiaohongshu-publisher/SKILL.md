@@ -24,30 +24,70 @@ If unsure, ALWAYS save as draft and let user review before publishing.
 - User must have a Xiaohongshu account
 - Python 3.9+ with dependencies: `pip install Pillow pyobjc-framework-Cocoa`
 
-## 🔐 Login State Persistence
+## 🔐 Multi-Account Support (多账号支持)
 
-agent-browser supports saving and loading authentication state, so users don't need to scan QR code every time.
+This skill supports multiple Xiaohongshu accounts with easy switching.
 
 ### Auth State File Location
+Each account has its own auth state file:
 ```
-~/.agent-browser/xiaohongshu-auth.json
-```
-
-### Save Auth State (after successful login)
-```bash
-npx agent-browser state save ~/.agent-browser/xiaohongshu-auth.json
+~/.agent-browser/xiaohongshu-auth-<account_name>.json
 ```
 
-### Load Auth State (to skip login)
-```bash
-npx agent-browser --state ~/.agent-browser/xiaohongshu-auth.json open "https://creator.xiaohongshu.com/publish/publish"
+Examples:
+```
+~/.agent-browser/xiaohongshu-auth-default.json    # Default account
+~/.agent-browser/xiaohongshu-auth-work.json       # Work account
+~/.agent-browser/xiaohongshu-auth-personal.json   # Personal account
 ```
 
-### Using Named Sessions (alternative)
+### Account Management Commands
+
+#### List All Saved Accounts
 ```bash
-# Use a persistent session for Xiaohongshu
-npx agent-browser --session xiaohongshu open "https://creator.xiaohongshu.com/publish/publish"
+ls ~/.agent-browser/xiaohongshu-auth-*.json 2>/dev/null | sed 's/.*xiaohongshu-auth-\(.*\)\.json/\1/'
 ```
+
+#### Add New Account
+```bash
+# 1. Open browser (without loading existing state)
+npx agent-browser open "https://creator.xiaohongshu.com/publish/publish"
+
+# 2. Scan QR code to login
+
+# 3. Save with account name
+npx agent-browser state save ~/.agent-browser/xiaohongshu-auth-<account_name>.json
+```
+
+#### Switch Account (Login with Different Account)
+```bash
+# Load specific account's auth state
+npx agent-browser --state ~/.agent-browser/xiaohongshu-auth-<account_name>.json open "https://creator.xiaohongshu.com/publish/publish"
+```
+
+#### Delete Account
+```bash
+rm ~/.agent-browser/xiaohongshu-auth-<account_name>.json
+```
+
+### Account Selection Logic
+
+When user wants to publish, determine which account to use:
+
+1. **User specifies account**: "用工作账号发布" → use `xiaohongshu-auth-work.json`
+2. **User says "切换账号"**: List available accounts and let user choose
+3. **No account specified**: Use `xiaohongshu-auth-default.json`
+4. **No saved accounts**: Prompt for QR login and save as `default`
+
+### Trigger Phrases for Account Operations
+
+| User Says | Action |
+|-----------|--------|
+| "用XX账号发布" / "使用XX账号" | Load `xiaohongshu-auth-XX.json` |
+| "切换账号" / "换个账号" / "switch account" | List accounts, let user choose |
+| "添加账号" / "新账号" / "add account" | QR login and save with new name |
+| "删除账号" / "remove account" | Delete specified auth file |
+| "列出账号" / "list accounts" | Show all saved accounts |
 
 ## Scripts
 
@@ -95,11 +135,37 @@ npx agent-browser close               # Close browser
 
 ## Workflow
 
-### Phase 1: Login Handling (with State Persistence)
+### Phase 0: Account Selection (多账号选择)
 
-1. **First, try to load saved auth state**:
+1. **Determine which account to use**:
+   - If user specifies: "用XX账号" → `account_name = "XX"`
+   - If user says "切换账号": List accounts and ask user to choose
+   - Otherwise: `account_name = "default"`
+
+2. **Check if account exists**:
    ```bash
-   npx agent-browser --state ~/.agent-browser/xiaohongshu-auth.json open "https://creator.xiaohongshu.com/publish/publish"
+   ls ~/.agent-browser/xiaohongshu-auth-${account_name}.json 2>/dev/null
+   ```
+
+3. **List available accounts** (if user asks or needs to choose):
+   ```bash
+   echo "已保存的账号："
+   ls ~/.agent-browser/xiaohongshu-auth-*.json 2>/dev/null | while read f; do
+     name=$(basename "$f" | sed 's/xiaohongshu-auth-\(.*\)\.json/\1/')
+     echo "  - $name"
+   done
+   ```
+
+### Phase 1: Login Handling (with Multi-Account Support)
+
+1. **Try to load saved auth state for selected account**:
+   ```bash
+   AUTH_FILE=~/.agent-browser/xiaohongshu-auth-${account_name}.json
+   if [ -f "$AUTH_FILE" ]; then
+     npx agent-browser --state "$AUTH_FILE" open "https://creator.xiaohongshu.com/publish/publish"
+   else
+     npx agent-browser open "https://creator.xiaohongshu.com/publish/publish"
+   fi
    ```
 
 2. **Check if login is still required** (take snapshot, look for QR code or login form)
@@ -111,11 +177,13 @@ npx agent-browser close               # Close browser
    - Switch to QR code login if needed (use JavaScript to click QR toggle)
    - **TELL USER**: "请使用小红书 App 扫描二维码登录"
    - Wait for login to complete
+   - **Ask user for account name** (if not specified): "请为此账号起个名字（如：work, personal, default）"
    - **SAVE AUTH STATE** after successful login:
      ```bash
-     npx agent-browser state save ~/.agent-browser/xiaohongshu-auth.json
+     mkdir -p ~/.agent-browser
+     npx agent-browser state save ~/.agent-browser/xiaohongshu-auth-${account_name}.json
      ```
-   - Tell user: "登录状态已保存，下次无需重新扫码"
+   - Tell user: "✅ 登录成功！账号「${account_name}」已保存，下次可直接使用。"
 
 ### Phase 2: Upload Images and Create Note
 
@@ -145,18 +213,22 @@ Output JSON:
 
 If user provides images directly, use those paths.
 
-## Step 2: Open Xiaohongshu Creator Platform (with Auth State)
+## Step 2: Open Xiaohongshu Creator Platform (with Multi-Account)
 
-**First, try loading saved auth state:**
+**Determine account and load auth state:**
 ```bash
-# Check if auth state file exists
-ls ~/.agent-browser/xiaohongshu-auth.json
+# Set account name (default if not specified by user)
+ACCOUNT_NAME="${account_name:-default}"
+AUTH_FILE=~/.agent-browser/xiaohongshu-auth-${ACCOUNT_NAME}.json
 
-# If exists, open with saved state
-npx agent-browser --state ~/.agent-browser/xiaohongshu-auth.json open "https://creator.xiaohongshu.com/publish/publish"
-
-# If not exists, open without state
-npx agent-browser open "https://creator.xiaohongshu.com/publish/publish"
+# Check if auth state file exists and load it
+if [ -f "$AUTH_FILE" ]; then
+  echo "使用账号: $ACCOUNT_NAME"
+  npx agent-browser --state "$AUTH_FILE" open "https://creator.xiaohongshu.com/publish/publish"
+else
+  echo "账号 $ACCOUNT_NAME 未登录，需要扫码"
+  npx agent-browser open "https://creator.xiaohongshu.com/publish/publish"
+fi
 ```
 
 Then take a snapshot:
@@ -164,7 +236,7 @@ Then take a snapshot:
 npx agent-browser snapshot -i
 ```
 
-## Step 3: Handle Login (with State Persistence)
+## Step 3: Handle Login (with Multi-Account Support)
 
 Check the snapshot for login elements or upload button.
 
@@ -184,15 +256,19 @@ npx agent-browser eval "const img = document.querySelector('img.css-wemwzq'); if
 npx agent-browser wait --text "上传图片" --timeout 120000
 ```
 
-4. **IMPORTANT: Save auth state after successful login**:
+4. **Ask for account name if not specified**:
+   - If user didn't specify account name, ask: "请为此账号起个名字（如：work, personal）,或直接回复「default」"
+
+5. **Save auth state with account name**:
 ```bash
 mkdir -p ~/.agent-browser
-npx agent-browser state save ~/.agent-browser/xiaohongshu-auth.json
+ACCOUNT_NAME="${account_name:-default}"
+npx agent-browser state save ~/.agent-browser/xiaohongshu-auth-${ACCOUNT_NAME}.json
 ```
 
-5. **Tell user**: "✅ 登录成功！登录状态已保存，下次无需重新扫码。"
+6. **Tell user**: "✅ 登录成功！账号「${ACCOUNT_NAME}」已保存。下次使用此账号发布时无需扫码。"
 
-6. Take a new snapshot:
+7. Take a new snapshot:
 ```bash
 npx agent-browser snapshot -i
 ```
@@ -274,57 +350,93 @@ Report to user:
 ## Critical Rules
 
 1. **🚨 NEVER AUTO-PUBLISH** - ALWAYS save as draft by default. Only publish if user EXPLICITLY says "直接发布/立即发布/publish now"
-2. **🔐 TRY SAVED AUTH STATE FIRST** - Always try loading `~/.agent-browser/xiaohongshu-auth.json` before asking user to scan QR
-3. **💾 SAVE AUTH STATE AFTER LOGIN** - After successful QR login, always save state for future use
-4. **ALWAYS handle QR login** - If no saved state or state expired, notify user clearly to scan QR
-5. **Wait for user to scan QR code** - Don't proceed until login is confirmed
-6. **Image limits** - Xiaohongshu allows 1-18 images per note
-7. **Content limits** - Title: ~20 chars suggested, Content: ~1000 chars max
-8. **Take snapshots frequently** - Page state changes, always get fresh refs
-9. **Confirm draft saved** - After saving, verify success and tell user to review on Xiaohongshu app
+2. **👥 SUPPORT MULTI-ACCOUNT** - Use account name in auth file: `xiaohongshu-auth-<account>.json`
+3. **🔐 TRY SAVED AUTH STATE FIRST** - Always try loading account's auth file before asking user to scan QR
+4. **💾 SAVE AUTH STATE WITH ACCOUNT NAME** - After successful QR login, ask for account name and save
+5. **🔄 HANDLE ACCOUNT SWITCHING** - When user says "切换账号", list accounts and let them choose
+6. **ALWAYS handle QR login** - If no saved state or state expired, notify user clearly to scan QR
+7. **Wait for user to scan QR code** - Don't proceed until login is confirmed
+8. **Image limits** - Xiaohongshu allows 1-18 images per note
+9. **Content limits** - Title: ~20 chars suggested, Content: ~1000 chars max
+10. **Take snapshots frequently** - Page state changes, always get fresh refs
+11. **Confirm draft saved** - After saving, verify success and tell user to review on Xiaohongshu app
 
-## Example Flow
+## Example Flows
+
+### Example 1: Basic Publish (Default Account)
 
 User: "发布这些图片到小红书: /path/to/photo1.jpg, /path/to/photo2.jpg, 标题是'周末好去处'"
 
 ```bash
-# 1. Check for saved auth state and open creator page
-if [ -f ~/.agent-browser/xiaohongshu-auth.json ]; then
-  npx agent-browser --state ~/.agent-browser/xiaohongshu-auth.json open "https://creator.xiaohongshu.com/publish/publish"
+# 1. Use default account
+ACCOUNT_NAME="default"
+AUTH_FILE=~/.agent-browser/xiaohongshu-auth-${ACCOUNT_NAME}.json
+
+# 2. Check for saved auth state and open creator page
+if [ -f "$AUTH_FILE" ]; then
+  npx agent-browser --state "$AUTH_FILE" open "https://creator.xiaohongshu.com/publish/publish"
 else
   npx agent-browser open "https://creator.xiaohongshu.com/publish/publish"
 fi
 
-# 2. Take snapshot to check login status
+# 3. Take snapshot to check login status
 npx agent-browser snapshot -i
 
-# 3. If already logged in (see "上传图片"), skip to step 5
-# 3. If login required:
-#    - Switch to QR code if needed
-npx agent-browser eval "const img = document.querySelector('img.css-wemwzq'); if(img) { img.click(); }"
-#    - [TELL USER]: "请使用小红书 App 扫描二维码登录"
-npx agent-browser wait --text "上传图片" --timeout 120000
-#    - Save auth state for future use
-mkdir -p ~/.agent-browser
-npx agent-browser state save ~/.agent-browser/xiaohongshu-auth.json
-#    - [TELL USER]: "✅ 登录成功！登录状态已保存。"
+# 4. If login required, handle QR code and save with account name
+# ... (see Step 3 for details)
+npx agent-browser state save ~/.agent-browser/xiaohongshu-auth-${ACCOUNT_NAME}.json
 
-# 4. Take new snapshot after login
-npx agent-browser snapshot -i
-
-# 5. Upload images (find file input ref from snapshot)
+# 5. Upload and fill content
 npx agent-browser upload @e<ref> "/path/to/photo1.jpg,/path/to/photo2.jpg"
-npx agent-browser wait 3000
-
-# 6. Take snapshot, fill title
-npx agent-browser snapshot -i
 npx agent-browser fill @e<title_ref> "周末好去处"
 
-# 7. ⚠️ ALWAYS save as draft (NOT publish!)
-npx agent-browser click @e<draft_ref>  # Click "存草稿" button
+# 6. Save as draft
+npx agent-browser click @e<draft_ref>
+```
 
-# 8. Report success
-# [TELL USER]: "草稿已保存！请在小红书 App 中查看并确认后再发布。"
+### Example 2: Publish with Specific Account
+
+User: "用工作账号发布这些图片到小红书"
+
+```bash
+# Use "work" account
+ACCOUNT_NAME="work"
+AUTH_FILE=~/.agent-browser/xiaohongshu-auth-work.json
+
+npx agent-browser --state "$AUTH_FILE" open "https://creator.xiaohongshu.com/publish/publish"
+# ... rest of the flow
+```
+
+### Example 3: Switch Account
+
+User: "切换账号" or "换个账号发布"
+
+```bash
+# 1. List available accounts
+echo "已保存的账号："
+ls ~/.agent-browser/xiaohongshu-auth-*.json 2>/dev/null | while read f; do
+  name=$(basename "$f" | sed 's/xiaohongshu-auth-\(.*\)\.json/\1/')
+  echo "  - $name"
+done
+
+# 2. [ASK USER]: "请选择要使用的账号，或输入「新账号」添加新账号"
+# 3. Load selected account or proceed with new login
+```
+
+### Example 4: Add New Account
+
+User: "添加新账号" or "登录另一个小红书账号"
+
+```bash
+# 1. Open without loading any state
+npx agent-browser open "https://creator.xiaohongshu.com/publish/publish"
+
+# 2. Handle QR login
+# 3. [ASK USER]: "请为此账号起个名字（如：personal, work, shop）"
+# 4. Save with new account name
+ACCOUNT_NAME="<user_input>"
+npx agent-browser state save ~/.agent-browser/xiaohongshu-auth-${ACCOUNT_NAME}.json
+# 5. [TELL USER]: "✅ 账号「${ACCOUNT_NAME}」已添加！"
 ```
 
 **Note**: Even though user said "发布", we save as draft first. Only use "发布" button if user explicitly says "直接发布" or "立即发布".
@@ -334,13 +446,30 @@ npx agent-browser click @e<draft_ref>  # Click "存草稿" button
 ### Auth State Expired
 If saved auth state no longer works:
 ```bash
-# Delete old auth state
-rm ~/.agent-browser/xiaohongshu-auth.json
+# Delete old auth state for specific account
+rm ~/.agent-browser/xiaohongshu-auth-<account_name>.json
 
 # Open without state, re-login, and save new state
 npx agent-browser open "https://creator.xiaohongshu.com/publish/publish"
 # (scan QR code)
-npx agent-browser state save ~/.agent-browser/xiaohongshu-auth.json
+npx agent-browser state save ~/.agent-browser/xiaohongshu-auth-<account_name>.json
+```
+
+### List All Accounts
+```bash
+ls ~/.agent-browser/xiaohongshu-auth-*.json 2>/dev/null | \
+  sed 's/.*xiaohongshu-auth-\(.*\)\.json/\1/' | \
+  while read name; do echo "  - $name"; done
+```
+
+### Delete Specific Account
+```bash
+rm ~/.agent-browser/xiaohongshu-auth-<account_name>.json
+```
+
+### Delete All Accounts
+```bash
+rm ~/.agent-browser/xiaohongshu-auth-*.json
 ```
 
 ### QR Code Timeout

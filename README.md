@@ -49,6 +49,7 @@ Draft/Published Note
 ### Key Features
 
 - **QR Code Login Handling**: Detects login page, prompts you to scan QR code
+- **👥 Multi-Account Support**: Manage multiple Xiaohongshu accounts with easy switching
 - **🔐 Login State Persistence**: Save auth state after first login, skip QR scan next time
 - **Multi-Image Upload**: Upload up to 18 images at once
 - **Content Parsing**: Extract title, content, and tags from Markdown
@@ -169,18 +170,28 @@ When Xiaohongshu requires login, the skill will:
 
 **Tip**: Keep the Xiaohongshu app ready on your phone for quick scanning.
 
-### Login State Persistence
+### Multi-Account Support
 
-After your first successful login, the skill saves your auth state to:
+This skill supports multiple Xiaohongshu accounts! Each account is saved separately:
 ```
-~/.agent-browser/xiaohongshu-auth.json
+~/.agent-browser/xiaohongshu-auth-default.json   # Default account
+~/.agent-browser/xiaohongshu-auth-work.json      # Work account
+~/.agent-browser/xiaohongshu-auth-personal.json  # Personal account
 ```
 
-Next time you use the skill, it will automatically load this state and skip the QR code login!
+**Account Commands:**
+- "用工作账号发布" → Use work account
+- "切换账号" → List and switch accounts
+- "添加新账号" → Add a new account
 
-If your login expires, simply delete the file and scan QR again:
+**List saved accounts:**
 ```bash
-rm ~/.agent-browser/xiaohongshu-auth.json
+ls ~/.agent-browser/xiaohongshu-auth-*.json
+```
+
+**Delete an account:**
+```bash
+rm ~/.agent-browser/xiaohongshu-auth-<account_name>.json
 ```
 
 ---

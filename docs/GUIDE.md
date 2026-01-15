@@ -153,40 +153,58 @@ npx agent-browser wait --text "发布成功"
 - 命令行直接使用
 - 快照提供精确的元素引用
 
-### 2.4 QR码登录处理（支持状态持久化）
+### 2.4 QR码登录处理（支持多账号）
 
-小红书经常需要扫码登录，本 Skill 会：
+小红书经常需要扫码登录，本 Skill 支持多账号管理：
 
-1. **首先尝试加载已保存的登录状态**
-2. 如果已登录，跳过扫码直接继续
-3. 如果需要登录，检测登录页面（查找 QR 码元素）
-4. 通知用户："请使用小红书 App 扫描二维码登录"
-5. 等待登录完成（最多 2 分钟）
-6. **登录成功后保存状态**供下次使用
-7. 检测到登录成功后继续流程
+1. **确定使用哪个账号**（默认/工作/个人等）
+2. **尝试加载该账号的登录状态**
+3. 如果已登录，跳过扫码直接继续
+4. 如果需要登录，检测登录页面（查找 QR 码元素）
+5. 通知用户："请使用小红书 App 扫描二维码登录"
+6. 等待登录完成（最多 2 分钟）
+7. **询问账号名称**并保存状态
+8. 检测到登录成功后继续流程
 
 ```
 ┌─────────────────────────────────────┐
-│  首次登录流程                          │
+│  多账号登录流程                         │
 │                                     │
 │  1. 扫描二维码登录                      │
-│  2. 登录状态已保存到:                    │
-│     ~/.agent-browser/xiaohongshu-auth.json │
-│  3. 下次无需重新扫码！                   │
+│  2. 为此账号起个名字（如：work）          │
+│  3. 登录状态已保存到:                    │
+│     ~/.agent-browser/xiaohongshu-auth-work.json │
+│  4. 下次使用「工作账号」无需扫码！         │
 └─────────────────────────────────────┘
 ```
 
-#### 登录状态存储位置
+#### 账号存储位置
 
+每个账号单独保存：
 ```
-~/.agent-browser/xiaohongshu-auth.json
+~/.agent-browser/xiaohongshu-auth-default.json   # 默认账号
+~/.agent-browser/xiaohongshu-auth-work.json      # 工作账号
+~/.agent-browser/xiaohongshu-auth-personal.json  # 个人账号
 ```
 
-#### 清除登录状态（如过期）
+#### 账号操作
 
 ```bash
-rm ~/.agent-browser/xiaohongshu-auth.json
+# 列出所有账号
+ls ~/.agent-browser/xiaohongshu-auth-*.json
+
+# 删除特定账号
+rm ~/.agent-browser/xiaohongshu-auth-work.json
+
+# 删除所有账号
+rm ~/.agent-browser/xiaohongshu-auth-*.json
 ```
+
+#### 使用指定账号
+
+- "用工作账号发布" → 使用 work 账号
+- "用个人账号发布" → 使用 personal 账号
+- "切换账号" → 列出并选择账号
 
 ### 2.5 安全设计
 
@@ -428,13 +446,32 @@ A: 可以，在请求中明确说明：
 
 ### Q5.5: 每次都要扫码登录吗？
 
-A: 不需要！技能支持**登录状态持久化**：
-- 首次登录后，状态会保存到 `~/.agent-browser/xiaohongshu-auth.json`
+A: 不需要！技能支持**多账号登录状态持久化**：
+- 首次登录后，状态会保存到 `~/.agent-browser/xiaohongshu-auth-<账号名>.json`
 - 下次使用时自动加载，无需重新扫码
-- 如果登录过期，删除文件重新扫码即可：
+- 支持多个账号，每个账号单独保存
+- 如果登录过期，删除对应文件重新扫码即可：
   ```bash
-  rm ~/.agent-browser/xiaohongshu-auth.json
+  rm ~/.agent-browser/xiaohongshu-auth-<账号名>.json
   ```
+
+### Q5.6: 如何管理多个小红书账号？
+
+A: 技能支持多账号管理：
+
+**添加账号**：说 "添加新账号" 或 "登录另一个账号"
+
+**切换账号**：说 "切换账号" 或 "用XX账号发布"
+
+**列出账号**：
+```bash
+ls ~/.agent-browser/xiaohongshu-auth-*.json
+```
+
+**删除账号**：
+```bash
+rm ~/.agent-browser/xiaohongshu-auth-<账号名>.json
+```
 
 ### Q6: 图片数量有限制吗？
 

@@ -49,6 +49,7 @@
 ### 核心功能
 
 - **二维码登录处理**：检测登录页面，提示用户扫码
+- **👥 多账号支持**：管理多个小红书账号，轻松切换
 - **🔐 登录状态持久化**：首次登录后保存状态，下次无需扫码
 - **多图上传**：一次上传最多 18 张图片
 - **内容解析**：从 Markdown 提取标题、内容、标签
@@ -169,18 +170,28 @@ cp -r xiaohongshu-publisher-skill/skills/xiaohongshu-publisher ~/.claude/skills/
 
 **提示**：手机上准备好小红书 App，方便快速扫码。
 
-### 登录状态持久化
+### 多账号支持
 
-首次成功登录后，技能会将登录状态保存到：
+本技能支持多个小红书账号！每个账号单独保存：
 ```
-~/.agent-browser/xiaohongshu-auth.json
+~/.agent-browser/xiaohongshu-auth-default.json   # 默认账号
+~/.agent-browser/xiaohongshu-auth-work.json      # 工作账号
+~/.agent-browser/xiaohongshu-auth-personal.json  # 个人账号
 ```
 
-下次使用技能时，会自动加载此状态，跳过二维码登录！
+**账号操作指令：**
+- "用工作账号发布" → 使用工作账号
+- "切换账号" → 列出并切换账号
+- "添加新账号" → 添加新账号
 
-如果登录过期，只需删除文件并重新扫码：
+**列出已保存的账号：**
 ```bash
-rm ~/.agent-browser/xiaohongshu-auth.json
+ls ~/.agent-browser/xiaohongshu-auth-*.json
+```
+
+**删除账号：**
+```bash
+rm ~/.agent-browser/xiaohongshu-auth-<账号名>.json
 ```
 
 ---
