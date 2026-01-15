@@ -49,6 +49,7 @@ Draft/Published Note
 ### Key Features
 
 - **QR Code Login Handling**: Detects login page, prompts you to scan QR code
+- **🔐 Login State Persistence**: Save auth state after first login, skip QR scan next time
 - **Multi-Image Upload**: Upload up to 18 images at once
 - **Content Parsing**: Extract title, content, and tags from Markdown
 - **Safe by Default**: Saves as draft unless you specify publish
@@ -159,12 +160,28 @@ Publish /path/to/note.md to Xiaohongshu
 
 When Xiaohongshu requires login, the skill will:
 
-1. Detect the QR code login page
-2. **Display a message**: "Please scan the QR code with your Xiaohongshu app to log in."
-3. Wait for you to complete the login
-4. Continue with the publishing flow
+1. **First, try to load saved auth state** (skip QR if already logged in)
+2. If no saved state, detect the QR code login page
+3. **Display a message**: "Please scan the QR code with your Xiaohongshu app to log in."
+4. Wait for you to complete the login
+5. **Save auth state** for future use (no QR needed next time!)
+6. Continue with the publishing flow
 
 **Tip**: Keep the Xiaohongshu app ready on your phone for quick scanning.
+
+### Login State Persistence
+
+After your first successful login, the skill saves your auth state to:
+```
+~/.agent-browser/xiaohongshu-auth.json
+```
+
+Next time you use the skill, it will automatically load this state and skip the QR code login!
+
+If your login expires, simply delete the file and scan QR again:
+```bash
+rm ~/.agent-browser/xiaohongshu-auth.json
+```
 
 ---
 

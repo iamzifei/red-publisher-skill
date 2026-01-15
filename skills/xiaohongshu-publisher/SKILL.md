@@ -24,6 +24,31 @@ If unsure, ALWAYS save as draft and let user review before publishing.
 - User must have a Xiaohongshu account
 - Python 3.9+ with dependencies: `pip install Pillow pyobjc-framework-Cocoa`
 
+## 🔐 Login State Persistence
+
+agent-browser supports saving and loading authentication state, so users don't need to scan QR code every time.
+
+### Auth State File Location
+```
+~/.agent-browser/xiaohongshu-auth.json
+```
+
+### Save Auth State (after successful login)
+```bash
+npx agent-browser state save ~/.agent-browser/xiaohongshu-auth.json
+```
+
+### Load Auth State (to skip login)
+```bash
+npx agent-browser --state ~/.agent-browser/xiaohongshu-auth.json open "https://creator.xiaohongshu.com/publish/publish"
+```
+
+### Using Named Sessions (alternative)
+```bash
+# Use a persistent session for Xiaohongshu
+npx agent-browser --session xiaohongshu open "https://creator.xiaohongshu.com/publish/publish"
+```
+
 ## Scripts
 
 Located in `~/.claude/skills/xiaohongshu-publisher/scripts/`:
@@ -70,14 +95,27 @@ npx agent-browser close               # Close browser
 
 ## Workflow
 
-### Phase 1: QR Code Login Handling
+### Phase 1: Login Handling (with State Persistence)
 
-1. Navigate to Xiaohongshu creator page
-2. Check if login is required (look for QR code)
-3. If QR code detected:
-   - **IMPORTANT**: Tell user to scan the QR code with Xiaohongshu app
-   - Wait for login to complete (page will redirect)
-   - Verify login success
+1. **First, try to load saved auth state**:
+   ```bash
+   npx agent-browser --state ~/.agent-browser/xiaohongshu-auth.json open "https://creator.xiaohongshu.com/publish/publish"
+   ```
+
+2. **Check if login is still required** (take snapshot, look for QR code or login form)
+
+3. **If already logged in**: Proceed to Phase 2
+
+4. **If login required** (no saved state or state expired):
+   - Open page without state: `npx agent-browser open "https://creator.xiaohongshu.com/publish/publish"`
+   - Switch to QR code login if needed (use JavaScript to click QR toggle)
+   - **TELL USER**: "请使用小红书 App 扫描二维码登录"
+   - Wait for login to complete
+   - **SAVE AUTH STATE** after successful login:
+     ```bash
+     npx agent-browser state save ~/.agent-browser/xiaohongshu-auth.json
+     ```
+   - Tell user: "登录状态已保存，下次无需重新扫码"
 
 ### Phase 2: Upload Images and Create Note
 
@@ -107,9 +145,17 @@ Output JSON:
 
 If user provides images directly, use those paths.
 
-## Step 2: Open Xiaohongshu Creator Platform
+## Step 2: Open Xiaohongshu Creator Platform (with Auth State)
 
+**First, try loading saved auth state:**
 ```bash
+# Check if auth state file exists
+ls ~/.agent-browser/xiaohongshu-auth.json
+
+# If exists, open with saved state
+npx agent-browser --state ~/.agent-browser/xiaohongshu-auth.json open "https://creator.xiaohongshu.com/publish/publish"
+
+# If not exists, open without state
 npx agent-browser open "https://creator.xiaohongshu.com/publish/publish"
 ```
 
@@ -118,19 +164,35 @@ Then take a snapshot:
 npx agent-browser snapshot -i
 ```
 
-## Step 3: Handle Login (QR Code)
+## Step 3: Handle Login (with State Persistence)
 
-Check the snapshot for login elements. If you see a QR code or login prompt:
+Check the snapshot for login elements or upload button.
 
-1. **Tell the user**: "Please scan the QR code with your Xiaohongshu app to log in."
-2. Wait for the user to confirm login, or poll for page changes:
+### If "上传图片" button visible → Already logged in, skip to Step 4
+
+### If login required (QR code or login form visible):
+
+1. **Switch to QR code login** (if showing SMS form):
+```bash
+npx agent-browser eval "const img = document.querySelector('img.css-wemwzq'); if(img) { img.click(); 'clicked'; }"
+```
+
+2. **Tell the user**: "请使用小红书 App 扫描二维码登录"
+
+3. Wait for login to complete:
 ```bash
 npx agent-browser wait --text "上传图片" --timeout 120000
 ```
 
-This waits up to 2 minutes for the "上传图片" (upload images) button to appear.
+4. **IMPORTANT: Save auth state after successful login**:
+```bash
+mkdir -p ~/.agent-browser
+npx agent-browser state save ~/.agent-browser/xiaohongshu-auth.json
+```
 
-After login, take a new snapshot:
+5. **Tell user**: "✅ 登录成功！登录状态已保存，下次无需重新扫码。"
+
+6. Take a new snapshot:
 ```bash
 npx agent-browser snapshot -i
 ```
@@ -212,27 +274,40 @@ Report to user:
 ## Critical Rules
 
 1. **🚨 NEVER AUTO-PUBLISH** - ALWAYS save as draft by default. Only publish if user EXPLICITLY says "直接发布/立即发布/publish now"
-2. **ALWAYS handle QR login** - Xiaohongshu requires login, notify user clearly
-3. **Wait for user to scan QR code** - Don't proceed until login is confirmed
-4. **Image limits** - Xiaohongshu allows 1-18 images per note
-5. **Content limits** - Title: ~20 chars suggested, Content: ~1000 chars max
-6. **Take snapshots frequently** - Page state changes, always get fresh refs
-7. **Confirm draft saved** - After saving, verify success and tell user to review on Xiaohongshu app
+2. **🔐 TRY SAVED AUTH STATE FIRST** - Always try loading `~/.agent-browser/xiaohongshu-auth.json` before asking user to scan QR
+3. **💾 SAVE AUTH STATE AFTER LOGIN** - After successful QR login, always save state for future use
+4. **ALWAYS handle QR login** - If no saved state or state expired, notify user clearly to scan QR
+5. **Wait for user to scan QR code** - Don't proceed until login is confirmed
+6. **Image limits** - Xiaohongshu allows 1-18 images per note
+7. **Content limits** - Title: ~20 chars suggested, Content: ~1000 chars max
+8. **Take snapshots frequently** - Page state changes, always get fresh refs
+9. **Confirm draft saved** - After saving, verify success and tell user to review on Xiaohongshu app
 
 ## Example Flow
 
 User: "发布这些图片到小红书: /path/to/photo1.jpg, /path/to/photo2.jpg, 标题是'周末好去处'"
 
 ```bash
-# 1. Open creator page
-npx agent-browser open "https://creator.xiaohongshu.com/publish/publish"
+# 1. Check for saved auth state and open creator page
+if [ -f ~/.agent-browser/xiaohongshu-auth.json ]; then
+  npx agent-browser --state ~/.agent-browser/xiaohongshu-auth.json open "https://creator.xiaohongshu.com/publish/publish"
+else
+  npx agent-browser open "https://creator.xiaohongshu.com/publish/publish"
+fi
 
-# 2. Take snapshot
+# 2. Take snapshot to check login status
 npx agent-browser snapshot -i
 
-# 3. If QR code visible, tell user and wait
-# [TELL USER]: "Please scan the QR code with your Xiaohongshu app to log in."
+# 3. If already logged in (see "上传图片"), skip to step 5
+# 3. If login required:
+#    - Switch to QR code if needed
+npx agent-browser eval "const img = document.querySelector('img.css-wemwzq'); if(img) { img.click(); }"
+#    - [TELL USER]: "请使用小红书 App 扫描二维码登录"
 npx agent-browser wait --text "上传图片" --timeout 120000
+#    - Save auth state for future use
+mkdir -p ~/.agent-browser
+npx agent-browser state save ~/.agent-browser/xiaohongshu-auth.json
+#    - [TELL USER]: "✅ 登录成功！登录状态已保存。"
 
 # 4. Take new snapshot after login
 npx agent-browser snapshot -i
@@ -256,11 +331,29 @@ npx agent-browser click @e<draft_ref>  # Click "存草稿" button
 
 ## Troubleshooting
 
+### Auth State Expired
+If saved auth state no longer works:
+```bash
+# Delete old auth state
+rm ~/.agent-browser/xiaohongshu-auth.json
+
+# Open without state, re-login, and save new state
+npx agent-browser open "https://creator.xiaohongshu.com/publish/publish"
+# (scan QR code)
+npx agent-browser state save ~/.agent-browser/xiaohongshu-auth.json
+```
+
 ### QR Code Timeout
 If user takes too long to scan:
 - Re-take snapshot
 - Check if still on login page
 - Offer to restart the process
+
+### QR Code Not Visible (SMS form showing)
+Use JavaScript to click the QR code toggle:
+```bash
+npx agent-browser eval "const img = document.querySelector('img.css-wemwzq'); if(img) { img.click(); 'clicked'; }"
+```
 
 ### Upload Failed
 - Check image file exists and is valid format (jpg, png, gif, webp)
