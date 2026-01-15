@@ -1,11 +1,22 @@
 ---
 name: xiaohongshu-publisher
-description: Publish images and notes to Xiaohongshu (小红书) using agent-browser automation. Use when user wants to publish images to Xiaohongshu, or mentions "publish to 小红书", "post to Xiaohongshu", "发布到小红书", or wants help with Xiaohongshu note publishing. Handles QR code login and uploads images with text content.
+description: Publish images and notes to Xiaohongshu (小红书) using agent-browser automation. Use when user wants to publish images to Xiaohongshu, or mentions "publish to 小红书", "post to Xiaohongshu", "发布到小红书", or wants help with Xiaohongshu note publishing. Handles QR code login and uploads images with text content. ALWAYS saves as draft by default.
 ---
 
 # Xiaohongshu Publisher (小红书发布器)
 
 Publish images and notes to Xiaohongshu (小红书) Creator Platform using agent-browser automation.
+
+## ⚠️ IMPORTANT: Draft Mode by Default
+
+**This skill ALWAYS saves notes as DRAFT by default. It will NEVER auto-publish.**
+
+Only click the "发布" (publish) button if the user EXPLICITLY requests immediate publishing with phrases like:
+- "直接发布" / "立即发布" / "马上发布"
+- "publish now" / "publish directly" / "publish immediately"
+- "不要草稿，直接发" / "不存草稿"
+
+If unsure, ALWAYS save as draft and let user review before publishing.
 
 ## Prerequisites
 
@@ -169,19 +180,23 @@ npx agent-browser fill @e<tag_input_ref> "tag1"
 npx agent-browser press Enter
 ```
 
-## Step 7: Save or Publish
+## Step 7: Save as Draft (MANDATORY DEFAULT)
 
-**Default: Save as Draft** (safer option)
+**⚠️ CRITICAL: ALWAYS save as draft unless user EXPLICITLY requests immediate publishing.**
 
-Look for "存草稿" (save draft) button:
+### Default Action: Save as Draft
+Look for "存草稿" (save draft) button and click it:
 ```bash
 npx agent-browser click @e<draft_button_ref>
 ```
 
-Or if user explicitly wants to publish, click "发布" button:
+### Only If User Explicitly Requests Publishing
+ONLY click "发布" button if user said phrases like "直接发布", "立即发布", "publish now":
 ```bash
 npx agent-browser click @e<publish_button_ref>
 ```
+
+**When in doubt, ALWAYS save as draft.**
 
 ## Step 8: Verify and Report
 
@@ -196,12 +211,13 @@ Report to user:
 
 ## Critical Rules
 
-1. **ALWAYS handle QR login** - Xiaohongshu requires login, notify user clearly
-2. **Wait for user to scan QR code** - Don't proceed until login is confirmed
-3. **Default to draft** - Only publish if user explicitly requests
+1. **🚨 NEVER AUTO-PUBLISH** - ALWAYS save as draft by default. Only publish if user EXPLICITLY says "直接发布/立即发布/publish now"
+2. **ALWAYS handle QR login** - Xiaohongshu requires login, notify user clearly
+3. **Wait for user to scan QR code** - Don't proceed until login is confirmed
 4. **Image limits** - Xiaohongshu allows 1-18 images per note
 5. **Content limits** - Title: ~20 chars suggested, Content: ~1000 chars max
 6. **Take snapshots frequently** - Page state changes, always get fresh refs
+7. **Confirm draft saved** - After saving, verify success and tell user to review on Xiaohongshu app
 
 ## Example Flow
 
@@ -229,11 +245,14 @@ npx agent-browser wait 3000
 npx agent-browser snapshot -i
 npx agent-browser fill @e<title_ref> "周末好去处"
 
-# 7. Save as draft
-npx agent-browser click @e<draft_ref>
+# 7. ⚠️ ALWAYS save as draft (NOT publish!)
+npx agent-browser click @e<draft_ref>  # Click "存草稿" button
 
 # 8. Report success
+# [TELL USER]: "草稿已保存！请在小红书 App 中查看并确认后再发布。"
 ```
+
+**Note**: Even though user said "发布", we save as draft first. Only use "发布" button if user explicitly says "直接发布" or "立即发布".
 
 ## Troubleshooting
 
