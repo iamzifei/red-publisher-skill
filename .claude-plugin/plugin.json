@@ -1,7 +1,7 @@
 {
   "name": "xiaohongshu-publisher",
-  "version": "2.0.0",
-  "description": "Publish images and notes to Xiaohongshu (小红书) with agent-browser automation",
+  "version": "3.0.0",
+  "description": "Publish images and notes to Xiaohongshu (小红书) with agent-browser CDP mode",
   "author": {
     "name": "wshuyi"
   },
@@ -14,11 +14,13 @@
     "publishing",
     "images",
     "notes",
-    "social-media"
+    "social-media",
+    "agent-browser",
+    "cdp"
   ],
   "dependencies": {
-    "npm": ["agent-browser"],
-    "python": ["Pillow", "pyobjc-framework-Cocoa"]
+    "python": ["Pillow", "pyobjc-framework-Cocoa"],
+    "npm": ["agent-browser"]
   },
   "platforms": ["macos"]
 }

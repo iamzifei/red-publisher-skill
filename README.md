@@ -12,9 +12,9 @@
 
 ## English
 
-> Publish images and notes to Xiaohongshu (小红书) with one command. Supports QR code login, multi-account management, and multi-image uploads.
+> Publish images and notes to Xiaohongshu (小红书) with one command. Uses CDP mode to connect to your existing browser session.
 
-**v2.0.0** — Now using agent-browser for reliable automation
+**v3.0.0** — Now using agent-browser with CDP mode for seamless browser automation
 
 ### The Problem
 
@@ -31,7 +31,7 @@ Publishing to Xiaohongshu manually is tedious:
 
 | Task | Manual | With This Skill |
 |------|--------|-----------------|
-| Login | 30 sec - 1 min | Auto-detected, prompted |
+| Login | 30 sec - 1 min | Login once in browser, reuse session |
 | Image upload (5 images) | 2-3 min | 30 sec |
 | Title & content | 1-2 min | 10 sec |
 | **Total** | **5-10 min** | **1-2 min** |
@@ -40,54 +40,74 @@ Publishing to Xiaohongshu manually is tedious:
 
 ### The Solution
 
-This skill automates the entire publishing workflow:
+This skill uses **CDP (Chrome DevTools Protocol) mode** to connect to your existing browser:
+
+```
+1. Start Chrome with debug port
+2. Login to Xiaohongshu once in browser
+3. AI connects to your browser session
+4. Automates publishing while you stay logged in
+```
 
 ```
 Images/Markdown File
      ↓ Python parsing
 Structured Data (title, content, images, tags)
-     ↓ agent-browser CLI
-Xiaohongshu Creator Platform (browser automation)
+     ↓ agent-browser --cdp 9222
+Your Chrome Browser (already logged in)
      ↓
 Draft/Published Note
 ```
 
 ### Key Features
 
-- **QR Code Login Handling**: Detects login page, prompts you to scan QR code
-- **👥 Multi-Account Support**: Manage multiple Xiaohongshu accounts with easy switching
-- **🔐 Login State Persistence**: Save auth state after first login, skip QR scan next time
-- **Multi-Image Upload**: Upload up to 18 images at once
-- **Content Parsing**: Extract title, content, and tags from Markdown
-- **Safe by Default**: Saves as draft unless you specify publish
-- **agent-browser Powered**: Fast, reliable browser automation
+- **🔌 CDP Mode**: Connect to your existing browser via `--cdp 9222` flag
+- **🔐 Session Persistence**: Login once in Chrome, reuse session indefinitely
+- **📤 Multi-Image Upload**: Upload up to 18 images at once
+- **📝 Content Parsing**: Extract title, content, and tags from Markdown
+- **✅ Safe by Default**: Saves as draft unless you specify publish
+- **🛠️ agent-browser CLI**: Simple command-line interface, no MCP server needed
 
-### What's New in v2.0.0
+### What's New in v3.0.0
 
-| Feature | v1.x | v2.0 |
+| Feature | v2.x | v3.0 |
 |---------|------|------|
-| Platform | X (Twitter) | Xiaohongshu |
-| Browser automation | Playwright MCP | agent-browser CLI |
-| Login handling | Manual | QR code detection + prompt |
-| Account management | Single | Multi-account support |
-| Content type | Articles | Image notes |
+| Connection mode | New browser each time | CDP (connect to existing) |
+| Login handling | QR code detection + auth files | Login once in your browser |
+| Session management | Auth state files | Browser's own session |
+| Command format | `npx agent-browser open ...` | `npx agent-browser --cdp 9222 open ...` |
 
 ### Requirements
 
 | Requirement | Details |
 |-------------|---------|
 | Claude Code | [claude.ai/code](https://claude.ai/code) |
-| agent-browser | `npm install -g agent-browser` or use npx |
+| Chrome | Launch with `--remote-debugging-port=9222` |
 | Python 3.9+ | With dependencies below |
 | macOS | Currently macOS only |
 
 ```bash
 # Install Python dependencies
 pip install Pillow pyobjc-framework-Cocoa
-
-# Install agent-browser (optional, can use npx)
-npm install -g agent-browser
 ```
+
+### Pre-requisite: Launch Chrome with Debug Port
+
+Before using this skill, start Chrome with remote debugging:
+
+```bash
+# macOS
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222
+```
+
+**Tip**: Add an alias to your shell config (`~/.zshrc` or `~/.bashrc`):
+```bash
+alias chrome-debug='/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222'
+```
+
+Then login to Xiaohongshu once: https://creator.xiaohongshu.com/publish/publish
+
+**Tip**: After login, you can minimize the browser to the Dock. It must stay running, but you don't need to see it.
 
 ### Installation
 
@@ -131,55 +151,31 @@ Publish /path/to/note.md to Xiaohongshu
 ### Workflow Steps
 
 ```
-[1/6] Parse content...
+[1/5] Verify browser connection...
+      → Connect to Chrome via CDP (port 9222)
+      → Check if already logged in
+
+[2/5] Parse content...
       → Extract title, content, images, tags
 
-[2/6] Open Xiaohongshu creator page...
-      → Navigate to creator.xiaohongshu.com/publish/publish
-
-[3/6] Handle login (if needed)...
-      → If QR code detected: PROMPT USER TO SCAN
-      → Wait for login completion
-
-[4/6] Upload images...
+[3/5] Upload images...
       → Upload all images (1-18 supported)
 
-[5/6] Fill title and content...
+[4/5] Fill title and content...
       → Add title, description, tags
 
-[6/6] Save draft...
+[5/5] Save draft...
       → ✅ Review and publish manually
       → (Or publish directly if requested)
 ```
 
 ### Multi-Account Support
 
-This skill supports multiple Xiaohongshu accounts! Each account is saved separately:
+With CDP mode, account switching is handled by Chrome profiles:
 
-```
-~/.agent-browser/xiaohongshu-auth-default.json   # Default account
-~/.agent-browser/xiaohongshu-auth-work.json      # Work account
-~/.agent-browser/xiaohongshu-auth-personal.json  # Personal account
-```
-
-#### Account Commands
-
-| Command | Action |
-|---------|--------|
-| "用工作账号发布" | Use work account |
-| "切换账号" / "switch account" | List and switch accounts |
-| "添加新账号" / "add account" | Add a new account |
-| "删除账号" / "delete account" | Remove an account |
-
-#### Manage Accounts via CLI
-
-```bash
-# List saved accounts
-ls ~/.agent-browser/xiaohongshu-auth-*.json
-
-# Delete an account
-rm ~/.agent-browser/xiaohongshu-auth-<account_name>.json
-```
+1. **Use Chrome profiles** - Create different Chrome profiles for different accounts
+2. **Start Chrome with profile** - Launch Chrome with the desired profile before connecting
+3. **Or switch accounts in browser** - Login/logout in your browser, then use the skill
 
 ### Content Formats
 
@@ -230,14 +226,24 @@ rm ~/.agent-browser/xiaohongshu-auth-<account_name>.json
 
 ### FAQ
 
-**Q: Why agent-browser instead of Playwright MCP?**
-A: agent-browser provides a simpler CLI interface that's easier to use and doesn't require MCP server setup.
+**Q: Why CDP mode?**
+A: CDP mode connects to your existing browser session. Benefits:
+- No separate browser window
+- Reuse your existing login
+- Session persists as long as browser is open
+- Same agent-browser commands, just add `--cdp 9222`
 
-**Q: QR code timeout?**
-A: The skill waits up to 2 minutes for login. If timeout occurs, restart the process.
+**Q: Browser not connecting?**
+A: Make sure Chrome is running with debug port:
+```bash
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222
+```
+
+**Q: Session expired?**
+A: Just re-login in your Chrome browser. The AI will use your active session.
 
 **Q: Windows/Linux support?**
-A: Currently macOS only. PRs welcome for cross-platform clipboard support.
+A: Currently macOS only. PRs welcome for cross-platform support.
 
 **Q: Image upload failed?**
 A: Check: valid path, supported format (jpg/png/gif/webp), file size within limits.
@@ -269,9 +275,9 @@ xiaohongshu-publisher-skill/
 
 ## 中文
 
-> 一键发布图片笔记到小红书。支持二维码登录，多账号管理，多图上传。
+> 一键发布图片笔记到小红书。使用 CDP 模式连接到您已有的浏览器会话。
 
-**v2.0.0** — 使用 agent-browser 实现可靠的浏览器自动化
+**v3.0.0** — 使用 agent-browser + CDP 模式实现无缝浏览器自动化
 
 ### 痛点
 
@@ -288,7 +294,7 @@ xiaohongshu-publisher-skill/
 
 | 任务 | 手动 | 使用本技能 |
 |------|------|-----------|
-| 登录 | 30秒 - 1分钟 | 自动检测，提示扫码 |
+| 登录 | 30秒 - 1分钟 | 浏览器登录一次，复用会话 |
 | 上传5张图片 | 2-3 分钟 | 30 秒 |
 | 填写标题内容 | 1-2 分钟 | 10 秒 |
 | **总计** | **5-10 分钟** | **1-2 分钟** |
@@ -297,54 +303,74 @@ xiaohongshu-publisher-skill/
 
 ### 解决方案
 
-本技能自动化整个发布流程：
+本技能使用 **CDP (Chrome DevTools Protocol) 模式** 连接到您已有的浏览器：
+
+```
+1. 启动带调试端口的 Chrome
+2. 在浏览器中登录小红书（只需一次）
+3. AI 连接到您的浏览器会话
+4. 自动化发布，保持登录状态
+```
 
 ```
 图片/Markdown 文件
      ↓ Python 解析
 结构化数据 (标题, 内容, 图片, 标签)
-     ↓ agent-browser CLI
-小红书创作平台 (浏览器自动化)
+     ↓ agent-browser --cdp 9222
+您的 Chrome 浏览器 (已登录)
      ↓
 草稿/已发布笔记
 ```
 
 ### 核心功能
 
-- **二维码登录处理**：检测登录页面，提示用户扫码
-- **👥 多账号支持**：管理多个小红书账号，轻松切换
-- **🔐 登录状态持久化**：首次登录后保存状态，下次无需扫码
-- **多图上传**：一次上传最多 18 张图片
-- **内容解析**：从 Markdown 提取标题、内容、标签
-- **默认存草稿**：不会自动发布，除非明确指定
-- **agent-browser 驱动**：快速、可靠的浏览器自动化
+- **🔌 CDP 模式**：通过 `--cdp 9222` 参数连接到您已有的浏览器
+- **🔐 会话持久化**：浏览器登录一次，会话无限复用
+- **📤 多图上传**：一次上传最多 18 张图片
+- **📝 内容解析**：从 Markdown 提取标题、内容、标签
+- **✅ 默认存草稿**：不会自动发布，除非明确指定
+- **🛠️ agent-browser CLI**：简单的命令行界面，无需 MCP 服务器
 
-### v2.0.0 更新内容
+### v3.0.0 更新内容
 
-| 功能 | v1.x | v2.0 |
+| 功能 | v2.x | v3.0 |
 |------|------|------|
-| 平台 | X (Twitter) | 小红书 |
-| 浏览器自动化 | Playwright MCP | agent-browser CLI |
-| 登录处理 | 手动 | 二维码检测 + 提示 |
-| 账号管理 | 单账号 | 多账号支持 |
-| 内容类型 | 长文 | 图片笔记 |
+| 连接模式 | 每次新开浏览器 | CDP (连接已有浏览器) |
+| 登录处理 | 二维码检测 + auth 文件 | 浏览器登录一次即可 |
+| 会话管理 | Auth 状态文件 | 浏览器自带会话 |
+| 命令格式 | `npx agent-browser open ...` | `npx agent-browser --cdp 9222 open ...` |
 
 ### 环境要求
 
 | 需求 | 详情 |
 |------|------|
 | Claude Code | [claude.ai/code](https://claude.ai/code) |
-| agent-browser | `npm install -g agent-browser` 或使用 npx |
+| Chrome | 启动时加 `--remote-debugging-port=9222` |
 | Python 3.9+ | 需要下列依赖 |
 | macOS | 目前仅支持 macOS |
 
 ```bash
 # 安装 Python 依赖
 pip install Pillow pyobjc-framework-Cocoa
-
-# 安装 agent-browser (可选，可以用 npx)
-npm install -g agent-browser
 ```
+
+### 前置条件：启动带调试端口的 Chrome
+
+使用本技能前，先启动带远程调试的 Chrome：
+
+```bash
+# macOS
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222
+```
+
+**小贴士**：在 shell 配置文件 (`~/.zshrc` 或 `~/.bashrc`) 中添加别名：
+```bash
+alias chrome-debug='/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222'
+```
+
+然后在浏览器中登录小红书：https://creator.xiaohongshu.com/publish/publish
+
+**小贴士**：登录后可以把浏览器最小化到 Dock。浏览器需要保持运行，但不需要看到它。
 
 ### 安装
 
@@ -388,55 +414,31 @@ cp -r xiaohongshu-publisher-skill/skills/xiaohongshu-publisher ~/.claude/skills/
 ### 工作流程
 
 ```
-[1/6] 解析内容...
+[1/5] 验证浏览器连接...
+      → 通过 CDP 连接到 Chrome（端口 9222）
+      → 检查是否已登录
+
+[2/5] 解析内容...
       → 提取标题、内容、图片、标签
 
-[2/6] 打开小红书创作平台...
-      → 导航到 creator.xiaohongshu.com/publish/publish
-
-[3/6] 处理登录（如需要）...
-      → 检测到二维码：提示用户扫码
-      → 等待登录完成
-
-[4/6] 上传图片...
+[3/5] 上传图片...
       → 上传所有图片（支持 1-18 张）
 
-[5/6] 填写标题和内容...
+[4/5] 填写标题和内容...
       → 添加标题、描述、标签
 
-[6/6] 保存草稿...
+[5/5] 保存草稿...
       → ✅ 请手动检查后发布
       → （或直接发布，如果用户要求）
 ```
 
 ### 多账号支持
 
-本技能支持多个小红书账号！每个账号单独保存：
+使用 CDP 模式时，账号切换通过 Chrome 用户配置文件实现：
 
-```
-~/.agent-browser/xiaohongshu-auth-default.json   # 默认账号
-~/.agent-browser/xiaohongshu-auth-work.json      # 工作账号
-~/.agent-browser/xiaohongshu-auth-personal.json  # 个人账号
-```
-
-#### 账号操作指令
-
-| 指令 | 操作 |
-|------|------|
-| "用工作账号发布" | 使用工作账号 |
-| "切换账号" | 列出并切换账号 |
-| "添加新账号" | 添加新账号 |
-| "删除账号" | 删除指定账号 |
-
-#### 命令行管理账号
-
-```bash
-# 列出已保存的账号
-ls ~/.agent-browser/xiaohongshu-auth-*.json
-
-# 删除账号
-rm ~/.agent-browser/xiaohongshu-auth-<账号名>.json
-```
+1. **使用 Chrome 配置文件** - 为不同账号创建不同的 Chrome 配置文件
+2. **指定配置文件启动** - 使用目标配置文件启动 Chrome
+3. **或在浏览器中切换** - 在浏览器中登录/登出，然后使用本技能
 
 ### 内容格式
 
@@ -487,11 +489,21 @@ rm ~/.agent-browser/xiaohongshu-auth-<账号名>.json
 
 ### 常见问题
 
-**Q: 为什么用 agent-browser 而不是 Playwright MCP？**
-A: agent-browser 提供更简单的 CLI 接口，无需配置 MCP 服务器。
+**Q: 为什么使用 CDP 模式？**
+A: CDP 模式连接到您已有的浏览器会话。好处：
+- 无需单独的浏览器窗口
+- 复用已有的登录状态
+- 只要浏览器开着，会话就一直有效
+- 同样的 agent-browser 命令，只需加 `--cdp 9222`
 
-**Q: 二维码超时怎么办？**
-A: 技能会等待最多 2 分钟。如果超时，重新运行即可。
+**Q: 浏览器连接不上？**
+A: 确保 Chrome 以调试端口启动：
+```bash
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222
+```
+
+**Q: 会话过期了？**
+A: 直接在 Chrome 浏览器中重新登录即可。AI 会使用您当前的会话。
 
 **Q: 支持 Windows/Linux 吗？**
 A: 目前仅支持 macOS。欢迎提交 PR 支持其他平台。
@@ -500,7 +512,7 @@ A: 目前仅支持 macOS。欢迎提交 PR 支持其他平台。
 A: 检查：路径是否正确，格式是否支持（jpg/png/gif/webp），文件大小是否超限。
 
 **Q: 可以直接发布而不是存草稿吗？**
-A: 可以，在请求中说明 "直接发布" 或 "publish now" 即可。
+A: 可以，在请求中说明 "直接发布" 即可。
 
 ### 项目结构
 
@@ -524,6 +536,12 @@ xiaohongshu-publisher-skill/
 
 ## Changelog / 更新日志
 
+### v3.0.0 (2025-01)
+- **CDP Mode / CDP 模式**: Connect to existing browser via `--cdp 9222` flag / 通过 `--cdp 9222` 参数连接到已有浏览器
+- **Session Persistence / 会话持久化**: Login once in browser, reuse indefinitely / 浏览器登录一次，无限复用
+- **Simpler Setup / 更简单的配置**: Just start Chrome with debug port / 只需启动带调试端口的 Chrome
+- **Same CLI / 相同的命令行**: Same agent-browser commands, just add `--cdp 9222` / 相同的命令，只需加 `--cdp 9222`
+
 ### v2.0.0 (2025-01)
 - **Platform switch / 平台切换**: Xiaohongshu instead of X (Twitter) / 从 X 改为小红书
 - **agent-browser**: Replace Playwright MCP with agent-browser CLI / 用 agent-browser CLI 替代 Playwright MCP
@@ -531,12 +549,12 @@ xiaohongshu-publisher-skill/
 - **Multi-account / 多账号**: Support multiple accounts with easy switching / 支持多账号管理和切换
 - **Image-centric / 图片笔记**: Focus on image notes rather than articles / 专注于图片笔记而非长文
 
-### v1.1.0 (2025-12)
+### v1.1.0 (2024-12)
 - Block-index positioning for X Articles
 - Reverse insertion order
 - Optimized wait strategy
 
-### v1.0.0 (2025-12)
+### v1.0.0 (2024-12)
 - Initial release (X Articles publisher)
 
 ---
