@@ -1,5 +1,7 @@
 # Xiaohongshu Publisher Skill (小红书发布器)
 
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/H2T024VDBG)
+
 <p align="center">
   <strong>
     <a href="#english">English</a> | <a href="#中文">中文</a>
